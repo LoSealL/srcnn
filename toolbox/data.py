@@ -9,13 +9,18 @@ from toolbox.image import modcrop
 from toolbox.paths import data_dir
 
 
-def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3):
+def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, random=0):
     hr_sub_size = lr_sub_size * scale
     hr_sub_stride = lr_sub_stride * scale
+    if random:
+        x_list = np.random.random(random)
+        y_list = np.random.random(random)
+    else:
+        x_list, y_list = None, None
     lr_gen_sub = partial(generate_sub_images, size=lr_sub_size,
-                         stride=lr_sub_stride)
+                         stride=lr_sub_stride, random=(x_list, y_list))
     hr_gen_sub = partial(generate_sub_images, size=hr_sub_size,
-                         stride=hr_sub_stride)
+                         stride=hr_sub_stride, random=(x_list, y_list))
 
     lr_sub_arrays = []
     hr_sub_arrays = []
@@ -36,7 +41,15 @@ def load_image_pair(path, scale=3):
     return lr_image, hr_image
 
 
-def generate_sub_images(image, size, stride):
-    for i in range(0, image.size[0] - size + 1, stride):
-        for j in range(0, image.size[1] - size + 1, stride):
-            yield image.crop([i, j, i + size, j + size])
+def generate_sub_images(image, size, stride, random):
+    x_list, y_list = random
+    if x_list is not None and y_list is not None:
+        for x in x_list:
+            for y in y_list:
+                i = int(image.size[0] * x)
+                j = int(image.size[1] * y)
+                yield image.crop([i, j, i + size, j + size])
+    else:
+        for i in range(0, image.size[0] - size + 1, stride):
+            for j in range(0, image.size[1] - size + 1, stride):
+                yield image.crop([i, j, i + size, j + size])

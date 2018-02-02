@@ -27,12 +27,13 @@ else:
 # Data
 load_set = partial(load_set,
                    lr_sub_size=param['lr_sub_size'],
-                   lr_sub_stride=param['lr_sub_stride'])
+                   lr_sub_stride=param['lr_sub_stride'],
+                   random=20)
 
 # Training
 expt = Experiment(scale=param['scale'], load_set=load_set,
                   build_model=build_model,optimizer=optimizer,
-                  save_dir=param['save_dir'])
+                  save_dir=Path('./results') / param['save_dir'])
 expt.train(train_set=param['train_set'], val_set=param['val_set'],
            epochs=param['epochs'], resume=True)
 

@@ -2,6 +2,6 @@ from pathlib import Path
 from subprocess import run
 
 
-for param_file in Path('.').glob('*.json'):
+for param_file in Path('./experiments').glob('*.json'):
     print(f'Run {param_file.stem}')
     run(['python', 'run.py', str(param_file)])
