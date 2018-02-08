@@ -4,6 +4,7 @@
     "name": "srcnn",
     "params": {"f": [9, 1, 5],  "n": [64, 32]}
   },
+  "pre_upsample": true,
   "scale": 3,
   "train_set": "91-image",
   "val_set": "Set5",

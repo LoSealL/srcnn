@@ -1,29 +1,31 @@
+import time, matplotlib
+
+matplotlib.use('Agg')
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+
 from functools import partial
 from pathlib import Path
-import time
 
 from keras import backend as K
-from keras.callbacks import CSVLogger
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import CSVLogger, ModelCheckpoint
 from keras.optimizers import adam
 from keras.preprocessing.image import img_to_array
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
+# export pb model
+import tensorflow as tf
+from keras.models import load_model
 
 from toolbox.data import load_image_pair
 from toolbox.image import array_to_img
-from toolbox.metrics import psnr
+from toolbox.metrics import psnr, get_metrics
 from toolbox.models import bicubic
-from toolbox.paths import data_dir
+from toolbox.dataset import DATASET
 
 
 class Experiment(object):
-    def __init__(self, scale=3, load_set=None, build_model=None,
+    def __init__(self, scale=3, channel=1, load_set=None, build_model=None,
                  optimizer='adam', save_dir='.'):
         self.scale = scale
+        self.channel = channel
         self.load_set = partial(load_set, scale=scale)
         self.build_model = partial(build_model, scale=scale)
         self.optimizer = optimizer
@@ -62,21 +64,22 @@ class Experiment(object):
         return array
 
     def _ensure_channel(self, array, c):
-        return array[..., c:c+1]
+        return array[..., 0:c]
 
     def pre_process(self, array):
         array = self._ensure_dimension(array, 4)
-        array = self._ensure_channel(array, 0)
+        array = self._ensure_channel(array, self.channel)
         return array
 
-    def post_process(self, array, auxiliary_array):
-        array = np.concatenate([array, auxiliary_array[..., 1:]], axis=-1)
+    def post_process(self, array, auxiliary_array=None):
+        if self.channel == 1:
+            array = np.concatenate([array, auxiliary_array[..., 1:]], axis=-1)
         array = np.clip(array, 0, 255)
         return array
 
     def inverse_post_process(self, array):
         array = self._ensure_dimension(array, 4)
-        array = self._ensure_channel(array, 0)
+        array = self._ensure_channel(array, self.channel)
         return array
 
     def compile(self, model):
@@ -84,35 +87,27 @@ class Experiment(object):
         model.compile(optimizer=self.optimizer, loss='mse', metrics=[psnr])
         return model
 
-    def train(self, train_set='91-image', val_set='Set5', epochs=1,
-              resume=True):
-        # Load and process data
-        x_train, y_train = self.load_set(train_set)
-        x_val, y_val = self.load_set(val_set)
-        x_train, x_val = [self.pre_process(x)
-                          for x in [x_train, x_val]]
-        y_train, y_val = [self.inverse_post_process(y)
-                          for y in [y_train, y_val]]
-
+    def train(self, train_set='91-image', val_set='Set5', epochs=1, resume=True):
         # Compile model
-        model = self.compile(self.build_model(x_train))
+        model = self.compile(self.build_model(self.channel))
         model.summary()
-
-        # Save model architecture
-        # Currently in Keras 2 it's not possible to load a model with custom
-        # layers. So we just save it without checking consistency.
-        self.config_file.write_text(model.to_yaml())
-
         # Inherit weights
+        skip_training = False
         if resume:
             latest_epoch = self.latest_epoch
             if latest_epoch > -1:
                 weights_file = self.weights_file(epoch=latest_epoch)
                 model.load_weights(str(weights_file))
             initial_epoch = latest_epoch + 1
+            if initial_epoch >= epochs:
+                skip_training = True
         else:
             initial_epoch = 0
 
+        # Save model architecture
+        # Currently in Keras 2 it's not possible to load a model with custom
+        # layers. So we just save it without checking consistency.
+        self.config_file.write_text(model.to_yaml())
         # Set up callbacks
         callbacks = []
         callbacks += [ModelCheckpoint(str(self.model_file))]
@@ -120,9 +115,17 @@ class Experiment(object):
                                       save_weights_only=True)]
         callbacks += [CSVLogger(str(self.history_file), append=resume)]
 
-        # Train
-        model.fit(x_train, y_train, epochs=epochs, callbacks=callbacks,
-                  validation_data=(x_val, y_val), initial_epoch=initial_epoch)
+        # Load and process data
+        if not skip_training:
+            x_train, y_train = self.load_set(train_set)
+            x_val, y_val = self.load_set(val_set)
+            x_train, x_val = [self.pre_process(x)
+                              for x in [x_train, x_val]]
+            y_train, y_val = [self.inverse_post_process(y)
+                              for y in [y_train, y_val]]
+            # Train
+            model.fit(x_train, y_train, epochs=epochs, callbacks=callbacks,
+                      validation_data=(x_val, y_val), initial_epoch=initial_epoch)
 
         # Plot metrics history
         prefix = str(self.history_file).rsplit('.', maxsplit=1)[0]
@@ -140,16 +143,19 @@ class Experiment(object):
             plt.savefig('.'.join([prefix, metric.lower(), 'png']))
             plt.close()
 
-    def test(self, test_set='Set5', metrics=[psnr]):
+    def test(self, test_set='Set5', metrics=[psnr], pre_upsample=False):
         print('Test on', test_set)
         image_dir = self.test_dir / test_set
         image_dir.mkdir(exist_ok=True)
 
         # Evaluate metrics on each image
+        model = self.compile(self.build_model(self.channel))
         rows = []
-        for image_path in (data_dir / test_set).glob('*'):
-            rows += [self.test_on_image(str(image_path),
-                                        str(image_dir / image_path.stem),
+        for image_path in DATASET[test_set.upper()].test:
+            rows += [self.test_on_image(model,
+                                        image_path,
+                                        str(image_dir / Path(image_path).stem),
+                                        pre_upsample=pre_upsample,
                                         metrics=metrics)]
         df = pd.DataFrame(rows)
 
@@ -163,25 +169,23 @@ class Experiment(object):
 
         df.to_csv(str(self.test_dir / f'{test_set}/metrics.csv'))
 
-    def test_on_image(self, path, prefix, suffix='png', metrics=[psnr]):
+    def test_on_image(self, model, path, prefix, suffix='png', metrics=[psnr], pre_upsample=False):
         # Load images
-        lr_image, hr_image = load_image_pair(path, scale=self.scale)
+        lr_image, hr_image, cu_image = load_image_pair(path, scale=self.scale)
 
         # Generate bicubic image
         x = img_to_array(lr_image)[np.newaxis, ...]
-        bicubic_model = bicubic(x, scale=self.scale)
-        y = bicubic_model.predict_on_batch(x)
-        bicubic_array = np.clip(y[0], 0, 255)
+        y = img_to_array(cu_image)[np.newaxis, ...]
 
         # Generate output image and measure run time
         x = self.pre_process(x)
-        model = self.compile(self.build_model(x))
+        inputs = self.pre_process(y) if pre_upsample else x
         if self.model_file.exists():
             model.load_weights(str(self.model_file))
         start = time.perf_counter()
-        y_pred = model.predict_on_batch(x)
+        y_pred = model.predict_on_batch(inputs)
         end = time.perf_counter()
-        output_array = self.post_process(y_pred[0], bicubic_array)
+        output_array = self.post_process(y_pred[0], y[0])
         output_image = array_to_img(output_array, mode='YCbCr')
 
         # Record metrics
@@ -201,3 +205,23 @@ class Experiment(object):
             img.convert(mode='RGB').save('.'.join([prefix, label, suffix]))
 
         return row
+
+    @staticmethod
+    def export_pb_model(input_name=None, output_name=None,
+                        h5_model_path='model.h5', pb_model_path='model.pb'):
+        custom_object = get_metrics()
+        model = load_model(str(h5_model_path), custom_object)
+        sess = K.get_session()
+        if not output_name:
+            output_name = [n for n in model.output_names]
+        if not input_name:
+            input_name = [n for n in model.input_names]
+        for output, name in zip(model.outputs, output_name):
+            tf.identity(output, name=name)
+        for input, name in zip(model.inputs, input_name):
+            tf.identity(input, name=name)
+        const_graph = tf.graph_util.convert_variables_to_constants(
+            sess, sess.graph.as_graph_def(), output_name)
+        write_dir = Path(pb_model_path).parent
+        write_name = Path(pb_model_path).stem + '.pb'
+        tf.train.write_graph(const_graph, str(write_dir), write_name, False)

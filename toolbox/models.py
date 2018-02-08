@@ -15,14 +15,14 @@ def bicubic(x, scale=3):
     return model
 
 
-def srcnn(x, f=[9, 1, 5], n=[64, 32], scale=3):
+def srcnn(c, f=(9, 1, 5), n=(64, 32), scale=3):
     """Build an SRCNN model.
 
     See https://arxiv.org/abs/1501.00092
     """
     assert len(f) == len(n) + 1
-    model = bicubic(x, scale=scale)
-    c = x.shape[-1]
+    model = Sequential()
+    model.add(InputLayer([None, None, c]))
     for ni, fi in zip(n, f):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='relu'))
@@ -31,14 +31,13 @@ def srcnn(x, f=[9, 1, 5], n=[64, 32], scale=3):
     return model
 
 
-def fsrcnn(x, d=56, s=12, m=4, scale=3):
+def fsrcnn(c, d=56, s=12, m=4, scale=3):
     """Build an FSRCNN model.
 
     See https://arxiv.org/abs/1608.00367
     """
     model = Sequential()
-    model.add(InputLayer(input_shape=x.shape[-3:]))
-    c = x.shape[-1]
+    model.add(InputLayer(input_shape=[None, None, c]))
     f = [5, 1] + [3] * m + [1]
     n = [d, s] + [s] * m + [d]
     for ni, fi in zip(n, f):
@@ -49,14 +48,13 @@ def fsrcnn(x, d=56, s=12, m=4, scale=3):
     return model
 
 
-def nsfsrcnn(x, d=56, s=12, m=4, scale=3, pos=1):
+def nsfsrcnn(c, d=56, s=12, m=4, scale=3, pos=1):
     """Build an FSRCNN model, but change deconv position.
 
     See https://arxiv.org/abs/1608.00367
     """
     model = Sequential()
-    model.add(InputLayer(input_shape=x.shape[-3:]))
-    c = x.shape[-1]
+    model.add(InputLayer(input_shape=[None, None, c]))
     f1 = [5, 1] + [3] * pos
     n1 = [d, s] + [s] * pos
     f2 = [3] * (m - pos - 1) + [1]
@@ -76,7 +74,7 @@ def nsfsrcnn(x, d=56, s=12, m=4, scale=3, pos=1):
     return model
 
 
-def espcn(x, f=[5, 3, 3], n=[64, 32], scale=3):
+def espcn(x, f=(5, 3, 3), n=(64, 32), scale=3):
     """Build an ESPCN model.
 
     See https://arxiv.org/abs/1609.05158

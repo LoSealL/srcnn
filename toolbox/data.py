@@ -6,10 +6,9 @@ from keras.preprocessing.image import load_img
 
 from toolbox.image import bicubic_rescale
 from toolbox.image import modcrop
-from toolbox.paths import data_dir
+from toolbox.dataset import DATASET
 
-
-def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, random=0):
+def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, pre_upsample=False, random=0):
     hr_sub_size = lr_sub_size * scale
     hr_sub_stride = lr_sub_stride * scale
     if random:
@@ -24,13 +23,16 @@ def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, random=0):
 
     lr_sub_arrays = []
     hr_sub_arrays = []
-    for path in (data_dir / name).glob('*'):
-        lr_image, hr_image = load_image_pair(str(path), scale=scale)
+    cu_sub_arrays = []
+    for path in DATASET[name.upper()].train:
+        lr_image, hr_image, cu_image = load_image_pair(path, scale=scale)
         lr_sub_arrays += [img_to_array(img) for img in lr_gen_sub(lr_image)]
         hr_sub_arrays += [img_to_array(img) for img in hr_gen_sub(hr_image)]
+        cu_sub_arrays += [img_to_array(img) for img in hr_gen_sub(cu_image)]
     x = np.stack(lr_sub_arrays)
     y = np.stack(hr_sub_arrays)
-    return x, y
+    z = np.stack(cu_sub_arrays)
+    return z, y if pre_upsample else x, y
 
 
 def load_image_pair(path, scale=3):
@@ -38,7 +40,8 @@ def load_image_pair(path, scale=3):
     image = image.convert('YCbCr')
     hr_image = modcrop(image, scale)
     lr_image = bicubic_rescale(hr_image, 1 / scale)
-    return lr_image, hr_image
+    cu_image = bicubic_rescale(lr_image, scale)
+    return lr_image, hr_image, cu_image
 
 
 def generate_sub_images(image, size, stride, random):

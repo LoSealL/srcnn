@@ -12,8 +12,9 @@ __pycache__/
 *.bmp
 *.gif
 
-# VS code project folder
+# code project folder
 .vscode
+.idea
 
 # Distribution / packaging
 .Python
