@@ -8,7 +8,8 @@ from toolbox.image import bicubic_rescale
 from toolbox.image import modcrop
 from toolbox.dataset import DATASET
 
-def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, pre_upsample=False, random=0):
+
+def load_set(name, mode='train', lr_sub_size=11, lr_sub_stride=5, scale=3, pre_upsample=False, random=0):
     hr_sub_size = lr_sub_size * scale
     hr_sub_stride = lr_sub_stride * scale
     if random:
@@ -24,7 +25,7 @@ def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, pre_upsample=False,
     lr_sub_arrays = []
     hr_sub_arrays = []
     cu_sub_arrays = []
-    for path in DATASET[name.upper()].train:
+    for path in DATASET[name.upper()].__getattr__(mode):
         lr_image, hr_image, cu_image = load_image_pair(path, scale=scale)
         lr_sub_arrays += [img_to_array(img) for img in lr_gen_sub(lr_image)]
         hr_sub_arrays += [img_to_array(img) for img in hr_gen_sub(hr_image)]
@@ -32,7 +33,7 @@ def load_set(name, lr_sub_size=11, lr_sub_stride=5, scale=3, pre_upsample=False,
     x = np.stack(lr_sub_arrays)
     y = np.stack(hr_sub_arrays)
     z = np.stack(cu_sub_arrays)
-    return z, y if pre_upsample else x, y
+    return (z, y) if pre_upsample else (x, y)
 
 
 def load_image_pair(path, scale=3):

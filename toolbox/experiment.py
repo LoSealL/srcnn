@@ -117,8 +117,8 @@ class Experiment(object):
 
         # Load and process data
         if not skip_training:
-            x_train, y_train = self.load_set(train_set)
-            x_val, y_val = self.load_set(val_set)
+            x_train, y_train = self.load_set(train_set, mode='train')
+            x_val, y_val = self.load_set(val_set, mode='val')
             x_train, x_val = [self.pre_process(x)
                               for x in [x_train, x_val]]
             y_train, y_val = [self.inverse_post_process(y)

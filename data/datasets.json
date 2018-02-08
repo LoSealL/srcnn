@@ -5,7 +5,7 @@
       "url": "d:/Datasets/BSD100_SR/image_SRF_3",
       "filter": "*HR.*"
     },
-    "eval": {
+    "val": {
       "url": "d:/Datasets/BSD100_SR/image_SRF_3",
       "filter": "*HR.*"
     },
@@ -20,7 +20,7 @@
       "url": "d:/Datasets/BSR_bsds500/BSR/BSDS500/data/images/train",
       "filter": "*"
     },
-    "eval": {
+    "val": {
       "url": "d:/Datasets/BSR_bsds500/BSR/BSDS500/data/images/val",
       "filter": "*"
     },
@@ -35,7 +35,7 @@
       "url": "d:/Datasets/Urban100_SR/image_SRF_2",
       "filter": "*"
     },
-    "eval": {
+    "val": {
       "url": "d:/Datasets/Urban100_SR/image_SRF_2",
       "filter": "*"
     },
@@ -50,7 +50,7 @@
       "url": "d:/Datasets/SunHays80_SR/image_SRF_8",
       "filter": "*HR.*"
     },
-    "eval": {
+    "val": {
       "url": "d:/Datasets/SunHays80_SR/image_SRF_8",
       "filter": "*HR.*"
     },
@@ -65,7 +65,7 @@
       "url": "d:/Datasets/91-image",
       "filter": "*"
     },
-    "eval": {
+    "val": {
       "url": "d:/Datasets/91-image",
       "filter": "*"
     },
@@ -76,7 +76,7 @@
   },
   "SET5": {
     "name": "Set5",
-    "eval": {
+    "val": {
       "url": "d:/Datasets/Set5_SR/Set5/image_SRF_3",
       "filter": "*HR.*"
     },
@@ -87,7 +87,7 @@
   },
   "SET14": {
     "name": "Set14",
-    "eval": {
+    "val": {
       "url": "d:/Datasets/Set14_SR/Set14/image_SRF_3",
       "filter": "*HR.*"
     },

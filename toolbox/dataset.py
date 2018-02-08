@@ -16,17 +16,17 @@ DATASET = dict()
 class Dataset(object):
     """globs all images in the data path"""
 
-    def __init__(self, train, eval, test, train_filter, eval_filter, test_filter):
+    def __init__(self, train, val, test, train_filter, val_filter, test_filter):
         """Specify data path
 
         Args:
            :param train: training data
-           :param eval: evaluation data
+           :param val: validation data
            :param test: testing data
-           :param train_filter, eval_filter, test_filter: filename filters
+           :param train_filter, val_filter, test_filter: filename filters
         """
         self._train = self._preprocess(train, train_filter)
-        self._val = self._preprocess(eval, eval_filter)
+        self._val = self._preprocess(val, val_filter)
         self._test = self._preprocess(test, test_filter)
 
     @staticmethod
@@ -63,23 +63,23 @@ class Dataset(object):
                 return self._test
 
 
-with open(repo_dir / 'config/datasets.json', 'r') as fd:
+with open(repo_dir / 'data/datasets.json', 'r') as fd:
     config = json.load(fd)
     for k, v in config.items():
         _train, _train_filter = None, []
-        _eval, _eval_filter = None, []
+        _val, _val_filter = None, []
         _test, _test_filter = None, []
         if 'train' in v:
             _train = v['train']['url']
             _train_filter = v['train']['filter'].split(',')
-        if 'eval' in v:
-            _eval = v['eval']['url']
-            _eval_filter = v['eval']['filter'].split(',')
+        if 'val' in v:
+            _val = v['val']['url']
+            _val_filter = v['val']['filter'].split(',')
         if 'test' in v:
             _test = v['test']['url']
             _test_filter = v['test']['filter'].split(',')
         DATASET[k] = Dataset(
-            _train, _eval, _test,
+            _train, _val, _test,
             train_filter=_train_filter,
-            eval_filter=_eval_filter,
+            val_filter=_val_filter,
             test_filter=_test_filter)
