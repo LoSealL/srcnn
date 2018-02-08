@@ -96,7 +96,7 @@ class Experiment(object):
         if resume:
             latest_epoch = self.latest_epoch
             if latest_epoch > -1:
-                weights_file = self.weights_file(epoch=latest_epoch)
+                weights_file = self.weights_file(epoch=latest_epoch + 1)
                 model.load_weights(str(weights_file))
             initial_epoch = latest_epoch + 1
             if initial_epoch >= epochs:
@@ -151,7 +151,7 @@ class Experiment(object):
         # Evaluate metrics on each image
         model = self.compile(self.build_model(self.channel))
         rows = []
-        for image_path in DATASET[test_set.upper()].test:
+        for image_path in DATASET[test_set.upper()].val:
             rows += [self.test_on_image(model,
                                         image_path,
                                         str(image_dir / Path(image_path).stem),
@@ -209,6 +209,9 @@ class Experiment(object):
     @staticmethod
     def export_pb_model(input_name=None, output_name=None,
                         h5_model_path='model.h5', pb_model_path='model.pb'):
+        if K.backend() != 'tensorflow':
+            print("Can't export model for keras backend is %s" % K.backend())
+            return
         custom_object = get_metrics()
         model = load_model(str(h5_model_path), custom_object)
         sess = K.get_session()
