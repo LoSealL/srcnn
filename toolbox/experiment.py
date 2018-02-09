@@ -17,7 +17,6 @@ from keras.models import load_model
 from toolbox.data import load_image_pair
 from toolbox.image import array_to_img
 from toolbox.metrics import psnr, get_metrics
-from toolbox.models import bicubic
 from toolbox.dataset import DATASET
 
 
@@ -201,19 +200,20 @@ class Experiment(object):
         images_to_save += [(hr_image, 'original')]
         images_to_save += [(output_image, 'output')]
         images_to_save += [(lr_image, 'input')]
+        images_to_save += [(cu_image, 'bicubic')]
         for img, label in images_to_save:
             img.convert(mode='RGB').save('.'.join([prefix, label, suffix]))
 
         return row
 
-    @staticmethod
-    def export_pb_model(input_name=None, output_name=None,
-                        h5_model_path='model.h5', pb_model_path='model.pb'):
+    def export_pb_model(self, input_name=None, output_name=None,
+                        pb_model_path='model.pb'):
         if K.backend() != 'tensorflow':
             print("Can't export model for keras backend is %s" % K.backend())
             return
-        custom_object = get_metrics()
-        model = load_model(str(h5_model_path), custom_object)
+        model = self.compile(self.build_model(self.channel))
+        if self.model_file.exists():
+            model.load_weights(str(self.model_file))
         sess = K.get_session()
         if not output_name:
             output_name = [n for n in model.output_names]

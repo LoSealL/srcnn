@@ -2,15 +2,15 @@ from keras.layers import Conv2D
 from keras.layers import Conv2DTranspose
 from keras.layers import InputLayer
 from keras.models import Sequential
-import tensorflow as tf
+import tensorflow as tf, keras.backend as K
 
 from toolbox.layers import ImageRescale
 from toolbox.layers import Conv2DSubPixel
 
 
-def bicubic(x, scale=3):
+def bicubic(shape, scale=3):
     model = Sequential()
-    model.add(InputLayer(input_shape=x.shape[-3:]))
+    model.add(InputLayer(input_shape=shape))
     model.add(ImageRescale(scale, method=tf.image.ResizeMethod.BICUBIC))
     return model
 
@@ -70,25 +70,43 @@ def nsfsrcnn(c, d=56, s=12, m=4, scale=3, pos=1):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='relu'))
     model.add(Conv2D(n3, f3, padding='same',
-                         kernel_initializer='he_normal'))
+                     kernel_initializer='he_normal'))
     return model
 
 
-def espcn(x, f=(5, 3, 3), n=(64, 32), scale=3):
+def espcn(c, f=(5, 3, 3), n=(64, 32), scale=3):
     """Build an ESPCN model.
 
     See https://arxiv.org/abs/1609.05158
     """
+
+    def ps_init(shape, dtype=None):
+        r, _, C, _ = shape
+        indices = []
+        for i in range(r):
+            indices.append([])
+            for j in range(r):
+                indices[i].append([])
+                for _ in range(C):
+                    indices[i][j].append(i * r + j)
+        kernel = tf.one_hot(indices, r * r * C, dtype=dtype, name='ps_kernel')
+        assert kernel.shape == shape
+        return kernel
+
     assert len(f) == len(n) + 1
     model = Sequential()
-    model.add(InputLayer(input_shape=x.shape[1:]))
-    c = x.shape[-1]
+    model.add(InputLayer(input_shape=[None, None, 1]))
     for ni, fi in zip(n, f):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='tanh'))
     model.add(Conv2D(c * scale ** 2, f[-1], padding='same',
                      kernel_initializer='he_normal'))
-    model.add(Conv2DSubPixel(scale))
+    model.add(Conv2DTranspose(c, scale,
+                              strides=scale,
+                              padding='same',
+                              kernel_initializer=ps_init,
+                              trainable=False))
+    # model.add(Conv2DSubPixel(scale))
     return model
 
 

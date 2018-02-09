@@ -46,5 +46,4 @@ for test_set in param['test_sets']:
 
 # Export tensorflow .pb model
 expt.export_pb_model(['input_lr'], ['output_hr'],
-                     Path('./results') / param['save_dir'] / 'model.hdf5',
                      Path('./results') / param['save_dir'] / 'model.pb')

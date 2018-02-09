@@ -59,7 +59,7 @@
       "filter": "*LR.*"
     }
   },
-  "YANG91": {
+  "91-IMAGE": {
     "name": "Yang's 91",
     "train": {
       "url": "d:/Datasets/91-image",
