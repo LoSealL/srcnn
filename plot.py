@@ -13,7 +13,7 @@ for scale in [3, 4]:
         time = []
         psnr = []
         model = []
-        for save_dir in sorted(Path('.').glob(f'*-sc{scale}')):
+        for save_dir in sorted(Path(results_dir).glob(f'*-sc{scale}')):
             if 'bicubic' not in save_dir.stem:
                 model += [save_dir.stem.rsplit('-', 1)[0].upper()]
                 metrics_file = save_dir / f'test/{test_set}/metrics.csv'
@@ -36,7 +36,7 @@ for scale in [3, 4]:
 # History plot
 for scale in [3, 4]:
     plt.figure()
-    for save_dir in sorted(Path('.').glob(f'*-sc{scale}')):
+    for save_dir in sorted(Path(results_dir).glob(f'*-sc{scale}')):
         if 'bicubic' not in save_dir.stem:
             model = save_dir.stem.rsplit('-', 1)[0].upper()
             history_file = save_dir / f'train/history.csv'

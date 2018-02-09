@@ -6,12 +6,12 @@
   },
   "pre_upsample": true,
   "scale": 3,
-  "train_set": "BSD100",
+  "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": ["Set5", "Set14"],
   "lr_sub_size": 11,
   "lr_sub_stride": 5,
-  "epochs": 50,
+  "epochs": 200,
   "optimizer": {
     "name": "adam",
     "params": {
