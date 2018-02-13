@@ -1,13 +1,13 @@
 {
-  "save_dir": "srcnn-example",
+  "save_dir": "psrcn-example",
   "model": {
     "name": "srcnn",
     "params": {"f": [9, 1, 5],  "n": [64, 32]}
   },
   "loss": {
     "name": "pl",
-    "block": 4,
-    "conv": 3
+    "block": 2,
+    "conv": 2
   },
   "pre_upsample": true,
   "scale": 3,
@@ -17,5 +17,5 @@
   "test_sets": ["Set5", "Set14"],
   "lr_sub_size": 20,
   "lr_sub_stride": 11,
-  "epochs": 5
+  "epochs": 2
 }

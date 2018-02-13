@@ -3,7 +3,7 @@ import argparse, json
 from functools import partial
 from pathlib import Path
 from keras import optimizers
-from toolbox.data import load_set
+
 from toolbox.models import get_model
 from toolbox.experiment import Experiment
 
@@ -24,19 +24,21 @@ if 'optimizer' in param:
     optimizer = optimizer(**param['optimizer']['params'])
 else:
     optimizer = 'adam'
+if 'loss' in param:
+    loss = param['loss']
+else:
+    loss = {'name': 'mse'}
 
-# Data
-load_set = partial(load_set,
-                   lr_sub_size=param['lr_sub_size'],
-                   lr_sub_stride=param['lr_sub_stride'],
-                   pre_upsample=pre_upsample,
-                   random=random)
+expt = Experiment(scale=param['scale'], channel=channel,
+                  build_model=build_model,
+                  optimizer=optimizer, loss=loss,
+                  lr_sub_size=param['lr_sub_size'],
+                  lr_sub_stride=param['lr_sub_stride'],
+                  pre_upsample=pre_upsample,
+                  random=random,
+                  save_dir=Path('./results') / param['save_dir'])
 
 # Training
-expt = Experiment(scale=param['scale'], channel=channel,
-                  load_set=load_set, build_model=build_model,
-                  optimizer=optimizer,
-                  save_dir=Path('./results') / param['save_dir'])
 expt.train(train_set=param['train_set'], val_set=param['val_set'],
            epochs=param['epochs'], resume=True)
 

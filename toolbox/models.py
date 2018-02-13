@@ -2,15 +2,15 @@ from keras.layers import Conv2D
 from keras.layers import Conv2DTranspose
 from keras.layers import InputLayer
 from keras.models import Sequential
-import tensorflow as tf, keras.backend as K
+import tensorflow as tf
 
 from toolbox.layers import ImageRescale
 from toolbox.layers import Conv2DSubPixel
 
 
-def bicubic(shape, scale=3):
+def bicubic(c, scale=3):
     model = Sequential()
-    model.add(InputLayer(input_shape=shape))
+    model.add(InputLayer(input_shape=[None, None, c]))
     model.add(ImageRescale(scale, method=tf.image.ResizeMethod.BICUBIC))
     return model
 
@@ -95,18 +95,59 @@ def espcn(c, f=(5, 3, 3), n=(64, 32), scale=3):
 
     assert len(f) == len(n) + 1
     model = Sequential()
-    model.add(InputLayer(input_shape=[None, None, 1]))
+    model.add(InputLayer(input_shape=[None, None, c]))
     for ni, fi in zip(n, f):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='tanh'))
     model.add(Conv2D(c * scale ** 2, f[-1], padding='same',
                      kernel_initializer='he_normal'))
-    model.add(Conv2DTranspose(c, scale,
-                              strides=scale,
-                              padding='same',
-                              kernel_initializer=ps_init,
-                              trainable=False))
-    # model.add(Conv2DSubPixel(scale))
+    # model.add(Conv2DTranspose(c, scale,
+    #                           strides=scale,
+    #                           padding='same',
+    #                           kernel_initializer=ps_init,
+    #                           trainable=False))
+    model.add(Conv2DSubPixel(scale))
+    return model
+
+
+def vgg16(include_top=False, input_shape=None, input_tensor=None):
+    from keras.layers import Input
+    from keras.models import Model
+    from keras.layers import MaxPooling2D, Conv2D
+    from keras.engine.topology import get_source_inputs
+    from keras.utils.data_utils import get_file
+    import keras.backend as K
+    WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5'
+
+    # Determine proper input shape
+    if input_tensor is None:
+        img_input = Input(shape=input_shape)
+    else:
+        if not K.is_keras_tensor(input_tensor):
+            img_input = Input(tensor=input_tensor, shape=input_shape)
+        else:
+            img_input = input_tensor
+    # Block 1
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
+    x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+
+    # Block 2
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
+
+    # any potential predecessors of `input_tensor`.
+    if input_tensor is not None:
+        inputs = get_source_inputs(input_tensor)
+    else:
+        inputs = img_input
+    # Create model.
+    model = Model(inputs, x, name='vgg16')
+    weights_path = get_file('vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+                            WEIGHTS_PATH_NO_TOP,
+                            cache_subdir='models',
+                            file_hash='6d6bbae143d832006294945121d1f1fc')
+    model.load_weights(weights_path, True)
     return model
 
 

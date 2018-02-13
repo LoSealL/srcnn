@@ -1,12 +1,15 @@
 {
-  "save_dir": "espcn-sc3",
+  "save_dir": "psrcn-9-1-5-sc3",
   "model": {
-    "name": "espcn",
-    "params": {"f": [5, 3, 3],  "n": [64, 32]}
+    "name": "srcnn",
+    "params": {"f": [9, 1, 5],  "n": [64, 32]}
   },
   "loss": {
-    "name": "mse"
+    "name": "pl",
+    "block": 2,
+    "conv": 2
   },
+  "pre_upsample": true,
   "scale": 3,
   "channel": 1,
   "train_set": "91-image",
@@ -14,12 +17,12 @@
   "test_sets": ["Set5", "Set14"],
   "lr_sub_size": 11,
   "lr_sub_stride": 5,
-  "epochs": 200,
+  "epochs": 100,
   "optimizer": {
     "name": "adam",
     "params": {
-      "lr": 1e-3,
-      "decay": 0
+      "lr": 1e-5,
+      "decay": 1e-5
     }
   }
 }

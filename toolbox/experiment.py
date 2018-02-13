@@ -8,26 +8,41 @@ from pathlib import Path
 
 from keras import backend as K
 from keras.callbacks import CSVLogger, ModelCheckpoint
-from keras.optimizers import adam
 from keras.preprocessing.image import img_to_array
 # export pb model
 import tensorflow as tf
-from keras.models import load_model
 
-from toolbox.data import load_image_pair
+from toolbox.data import load_image_pair, load_set
 from toolbox.image import array_to_img
 from toolbox.metrics import psnr, get_metrics
 from toolbox.dataset import DATASET
+from toolbox.loss import get_loss
 
 
 class Experiment(object):
-    def __init__(self, scale=3, channel=1, load_set=None, build_model=None,
-                 optimizer='adam', save_dir='.'):
+    def __init__(self,
+                 scale=3,
+                 channel=1,
+                 build_model=None,
+                 optimizer='adam',
+                 loss={'name': 'mse'},
+                 lr_sub_size=11,
+                 lr_sub_stride=5,
+                 pre_upsample=False,
+                 random=0,
+                 save_dir='.',
+                 **kwargs):
         self.scale = scale
         self.channel = channel
-        self.load_set = partial(load_set, scale=scale)
+        self.load_set = partial(load_set,
+                                scale=scale,
+                                lr_sub_size=lr_sub_size,
+                                lr_sub_stride=lr_sub_stride,
+                                pre_upsample=pre_upsample,
+                                random=random)
         self.build_model = partial(build_model, scale=scale)
         self.optimizer = optimizer
+        self.loss = get_loss(**loss)
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -83,12 +98,14 @@ class Experiment(object):
 
     def compile(self, model):
         """Compile model with default settings."""
-        model.compile(optimizer=self.optimizer, loss='mse', metrics=[psnr])
+        model.compile(optimizer=self.optimizer,
+                      loss=self.loss,
+                      metrics=[psnr])
         return model
 
     def train(self, train_set='91-image', val_set='Set5', epochs=1, resume=True):
         # Compile model
-        model = self.compile(self.build_model(self.channel))
+        model = self.build_model(self.channel)
         model.summary()
         # Inherit weights
         skip_training = False
@@ -123,6 +140,9 @@ class Experiment(object):
             y_train, y_val = [self.inverse_post_process(y)
                               for y in [y_train, y_val]]
             # Train
+            model.input.set_shape([None] + list(x_train.shape[1:]))
+            model.output.set_shape([None] + list(y_train.shape[1:]))
+            model = self.compile(model)
             model.fit(x_train, y_train, epochs=epochs, callbacks=callbacks,
                       validation_data=(x_val, y_val), initial_epoch=initial_epoch)
 
