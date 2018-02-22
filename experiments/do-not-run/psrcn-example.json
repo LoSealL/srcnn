@@ -1,15 +1,18 @@
 {
   "save_dir": "psrcn-example",
   "model": {
-    "name": "srcnn",
-    "params": {"f": [9, 1, 5],  "n": [64, 32]}
+    "name": "espcn",
+    "params": {"f": [5, 3, 3],  "n": [64, 32]}
   },
   "loss": {
-    "name": "pl",
-    "block": 2,
+    "name": "mse_pl_tv",
+    "weight0": 1,
+    "weight1": 4,
+    "weight2": 0,
+    "block": 3,
     "conv": 2
   },
-  "pre_upsample": true,
+  "pre_upsample": false,
   "scale": 3,
   "channel": 1,
   "train_set": "91-image",
@@ -17,5 +20,5 @@
   "test_sets": ["Set5", "Set14"],
   "lr_sub_size": 20,
   "lr_sub_stride": 11,
-  "epochs": 2
+  "epochs": 100
 }

@@ -51,17 +51,20 @@ def pl(block=2, conv=2, **kwargs):
         y_pred_norm = VGGNormalize()(y_pred)
         feature_true = model(y_true_norm)
         feature_pred = model(y_pred_norm)
-        return weight * mean_squared_error(feature_true, feature_pred)
+        return weight * K.mean(K.square(feature_true - feature_pred))
 
     return loss
 
 
-def combined(weight1=1, weight2=1e-6, **kwargs):
+def mse_pl_tv(weight0=1, weight1=4, weight2=1e-6, **kwargs):
     loss1 = pl(weight=weight1, **kwargs)
     loss2 = tv(weight=weight2, **kwargs)
 
     def loss(y_true, y_pred):
-        return loss1(y_true, y_pred) + loss2(y_true, y_pred)
+        l_mse = weight0 * K.mean(K.square(y_true - y_pred))
+        l_pl = loss1(y_true, y_pred)
+        l_tv = loss2(y_true, y_pred)
+        return l_mse + l_pl + l_tv
 
     return loss
 
