@@ -30,9 +30,9 @@ def load_set(name, mode='train', lr_sub_size=11, lr_sub_stride=5, scale=3, pre_u
         lr_sub_arrays += [img_to_array(img) for img in lr_gen_sub(lr_image)]
         hr_sub_arrays += [img_to_array(img) for img in hr_gen_sub(hr_image)]
         cu_sub_arrays += [img_to_array(img) for img in hr_gen_sub(cu_image)]
-    x = np.stack(lr_sub_arrays)
-    y = np.stack(hr_sub_arrays)
-    z = np.stack(cu_sub_arrays)
+    x = np.stack(lr_sub_arrays).astype('uint8')
+    y = np.stack(hr_sub_arrays).astype('uint8')
+    z = np.stack(cu_sub_arrays).astype('uint8')
     return (z, y) if pre_upsample else (x, y)
 
 

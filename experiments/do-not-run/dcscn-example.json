@@ -1,0 +1,28 @@
+{
+  "save_dir": "dcscn-example",
+  "model": {
+    "name": "dcscn",
+    "params": {"nfilters": 7, "f": [96, 76, 65, 55, 47, 39, 32], "A": 64, "B": [32, 32]}
+  },
+  "loss": {
+    "name": "mse",
+    "block": 3,
+    "conv": 2
+  },
+  "pre_upsample": false,
+  "scale": 3,
+  "channel": 1,
+  "train_set": "91-image",
+  "val_set": "Set5",
+  "test_sets": ["Set5", "Set14"],
+  "lr_sub_size": 20,
+  "lr_sub_stride": 11,
+  "epochs": 10,
+  "optimizer": {
+    "name": "adam",
+    "params": {
+      "lr": 0.02,
+      "decay": 0
+    }
+  }
+}

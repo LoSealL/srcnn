@@ -1,8 +1,8 @@
 {
-  "save_dir": "psrcn-example",
+  "save_dir": "fastsr-example",
   "model": {
-    "name": "espcn",
-    "params": {"f": [5, 3, 3],  "n": [64, 32]}
+    "name": "fastsr",
+    "params": {}
   },
   "loss": {
     "name": "mse_pl_tv",
@@ -12,13 +12,12 @@
     "block": 3,
     "conv": 2
   },
-  "pre_upsample": false,
   "scale": 3,
-  "channel": 1,
+  "channel": 3,
   "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": ["Set5", "Set14"],
   "lr_sub_size": 20,
   "lr_sub_stride": 11,
-  "epochs": 200
+  "epochs": 100
 }

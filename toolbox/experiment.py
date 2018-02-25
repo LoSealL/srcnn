@@ -7,16 +7,17 @@ from functools import partial
 from pathlib import Path
 
 from keras import backend as K
-from keras.callbacks import CSVLogger, ModelCheckpoint
+from keras.callbacks import CSVLogger, ModelCheckpoint, EarlyStopping
 from keras.preprocessing.image import img_to_array
 # export pb model
 import tensorflow as tf
 
 from toolbox.data import load_image_pair, load_set
 from toolbox.image import array_to_img
-from toolbox.metrics import psnr, get_metrics
+from toolbox.metrics import psnr
 from toolbox.dataset import DATASET
 from toolbox.loss import get_loss
+from toolbox.callbacks import LearningRateScheduler, SchedulerByLossGrad
 
 
 class Experiment(object):
@@ -130,6 +131,7 @@ class Experiment(object):
         callbacks += [ModelCheckpoint(str(self.weights_file()),
                                       save_weights_only=True)]
         callbacks += [CSVLogger(str(self.history_file), append=resume)]
+        # callbacks += [LearningRateScheduler(SchedulerByLossGrad(0.02,2))]
 
         # Load and process data
         if not skip_training:
@@ -202,7 +204,7 @@ class Experiment(object):
         if self.model_file.exists():
             model.load_weights(str(self.model_file))
         start = time.perf_counter()
-        y_pred = model.predict_on_batch(inputs)
+        y_pred = model.predict_on_batch(inputs.astype('uint8'))
         end = time.perf_counter()
         output_array = self.post_process(y_pred[0], y[0])
         output_image = array_to_img(output_array, mode='YCbCr')
@@ -239,7 +241,10 @@ class Experiment(object):
             output_name = [n for n in model.output_names]
         if not input_name:
             input_name = [n for n in model.input_names]
-        for output, name in zip(model.outputs, output_name):
+        casted_outputs = []
+        for outp in model.outputs:
+            casted_outputs.append(K.cast(K.clip(outp, 0, 255), 'uint8'))
+        for output, name in zip(casted_outputs, output_name):
             tf.identity(output, name=name)
         for input, name in zip(model.inputs, input_name):
             tf.identity(input, name=name)

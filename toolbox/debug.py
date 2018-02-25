@@ -102,5 +102,21 @@ def mse_calc():
     print(K.eval(s2))
 
 
+def test_pb_model():
+    import tensorflow as tf
+    from tensorflow.python.platform import gfile
+    with tf.Session() as sess:
+        model_filename = '../results/srcnn-example/model.pb'
+        with gfile.FastGFile(model_filename, 'rb') as f:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString(f.read())
+            g_in = tf.import_graph_def(graph_def)
+        g = sess.graph
+        img = np.ones([1, 256, 256, 1])
+        a = sess.graph.get_tensor_by_name("import/input_4:0")
+        b = sess.graph.get_tensor_by_name("import/CastedClipOutput:0")
+        sess.run("import/CastedClipOutput:0", feed_dict={"import/input_4:0": img})
+
+
 if __name__ == '__main__':
-    mse_calc()
+    test_pb_model()

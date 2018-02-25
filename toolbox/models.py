@@ -1,11 +1,19 @@
-from keras.layers import Conv2D
-from keras.layers import Conv2DTranspose
-from keras.layers import InputLayer
-from keras.models import Sequential
+from keras.layers import (
+    Conv2D, Conv2DTranspose, SeparableConv2D,
+    InputLayer, Input, PReLU, Dropout,
+    Add, Concatenate
+)
+from keras.regularizers import l2
+from keras.models import Sequential, Model
 import tensorflow as tf
 
-from toolbox.layers import ImageRescale
-from toolbox.layers import Conv2DSubPixel
+from toolbox.layers import (
+    ImageRescale,
+    Conv2DSubPixel,
+    CastUInt2Float,
+    RecursiveConv2D,
+    WeightedAdd
+)
 
 
 def bicubic(c, scale=3):
@@ -22,7 +30,8 @@ def srcnn(c, f=(9, 1, 5), n=(64, 32), scale=3):
     """
     assert len(f) == len(n) + 1
     model = Sequential()
-    model.add(InputLayer([None, None, c]))
+    model.add(InputLayer([None, None, c], dtype='uint8'))
+    model.add(CastUInt2Float())
     for ni, fi in zip(n, f):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='relu'))
@@ -37,7 +46,8 @@ def fsrcnn(c, d=56, s=12, m=4, scale=3):
     See https://arxiv.org/abs/1608.00367
     """
     model = Sequential()
-    model.add(InputLayer(input_shape=[None, None, c]))
+    model.add(InputLayer([None, None, c], dtype='uint8'))
+    model.add(CastUInt2Float())
     f = [5, 1] + [3] * m + [1]
     n = [d, s] + [s] * m + [d]
     for ni, fi in zip(n, f):
@@ -54,7 +64,8 @@ def nsfsrcnn(c, d=56, s=12, m=4, scale=3, pos=1):
     See https://arxiv.org/abs/1608.00367
     """
     model = Sequential()
-    model.add(InputLayer(input_shape=[None, None, c]))
+    model.add(InputLayer([None, None, c], dtype='uint8'))
+    model.add(CastUInt2Float())
     f1 = [5, 1] + [3] * pos
     n1 = [d, s] + [s] * pos
     f2 = [3] * (m - pos - 1) + [1]
@@ -95,7 +106,8 @@ def espcn(c, f=(5, 3, 3), n=(64, 32), scale=3):
 
     assert len(f) == len(n) + 1
     model = Sequential()
-    model.add(InputLayer(input_shape=[None, None, c]))
+    model.add(InputLayer([None, None, c], dtype='uint8'))
+    model.add(CastUInt2Float())
     for ni, fi in zip(n, f):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='tanh'))
@@ -110,44 +122,78 @@ def espcn(c, f=(5, 3, 3), n=(64, 32), scale=3):
     return model
 
 
-def vgg16(include_top=False, input_shape=None, input_tensor=None):
-    from keras.layers import Input
-    from keras.models import Model
-    from keras.layers import MaxPooling2D, Conv2D
-    from keras.engine.topology import get_source_inputs
-    from keras.utils.data_utils import get_file
-    import keras.backend as K
-    WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5'
+def drcn(c, f=256, k=3, scale=3):
+    """Deeply-Recursive Convolutional Network
 
-    # Determine proper input shape
-    if input_tensor is None:
-        img_input = Input(shape=input_shape)
-    else:
-        if not K.is_keras_tensor(input_tensor):
-            img_input = Input(tensor=input_tensor, shape=input_shape)
-        else:
-            img_input = input_tensor
-    # Block 1
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
-    x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+     See https://arxiv.org/abs/1511.04491
+    """
 
-    # Block 2
-    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
-    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
+    def embed(t):
+        t = Conv2D(f, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
+        t = Conv2D(f, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
+        return t
 
-    # any potential predecessors of `input_tensor`.
-    if input_tensor is not None:
-        inputs = get_source_inputs(input_tensor)
-    else:
-        inputs = img_input
-    # Create model.
-    model = Model(inputs, x, name='vgg16')
-    weights_path = get_file('vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
-                            WEIGHTS_PATH_NO_TOP,
-                            cache_subdir='models',
-                            file_hash='6d6bbae143d832006294945121d1f1fc')
-    model.load_weights(weights_path, True)
+    def infer(t, recursion=16):
+        return RecursiveConv2D(recursion)(t)
+
+    def reconstruct(t):
+        t = Conv2D(f, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
+        t = Conv2D(c, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
+        return t
+
+    x = Input(shape=[None, None, c], dtype='uint8')
+    x0 = CastUInt2Float()(x)
+    x1 = embed(x0)
+    x2 = infer(x1)
+    x3 = [Add()([x0, reconstruct(t)]) for t in x2]
+    y = WeightedAdd(len(x3))(x3)
+    model = Model(x, [y] + x3, name='DRCN')
+    return model
+
+
+def fastsr(c, scale=3):
+    model = Sequential()
+    model.add(InputLayer([None, None, c], dtype='uint8'))
+    model.add(CastUInt2Float())
+    model.add(SeparableConv2D(64, 9, padding='same', activation='relu', kernel_initializer='he_normal'))
+    model.add(SeparableConv2D(32, 5, padding='same', activation='relu', kernel_initializer='he_normal'))
+    model.add(SeparableConv2D(c * scale ** 2, 5, padding='same',
+                              activation='relu', kernel_initializer='he_normal'))
+    model.add(Conv2DSubPixel(scale))
+    return model
+
+
+def dcscn(c, nfilters=7, f=(96, 76, 65, 55, 47, 39, 32), A=64, B=(32, 32), scale=3):
+    """Deep CNN with Skip Connection and Network in Network
+
+    See https://arxiv.org/abs/1707.05425
+    """
+
+    def conv2d(t, f, k, l2_weight=0.0001, dropout=0.8, **kwargs):
+        t = Conv2D(f, k, padding='same',
+                   activation='relu',
+                   kernel_initializer='he_normal',
+                   kernel_regularizer=l2(l2_weight),
+                   **kwargs)(t)
+        # t = PReLU()(t)
+        # t = Dropout(dropout)(t)
+        return t
+
+    inputs = Input([None, None, c], dtype='uint8')
+    xflt = CastUInt2Float()(inputs)
+    xbic = bicubic(c, scale)(xflt)
+    x = [xflt]
+    for i in range(nfilters):
+        x.append(conv2d(x[i], f[i], 3))
+    x_concat = Concatenate(axis=3)(x[1:])
+    a1 = conv2d(x_concat, A, 1, name='A1')
+    b1 = conv2d(x_concat, B[0], 1, name='B1')
+    b2 = conv2d(b1, B[1], 3, name='B2')
+    x_concat = Concatenate(axis=3)([a1, b1, b2])
+    x_out = conv2d(x_concat, scale ** 2, 1)
+    x_out = Conv2DSubPixel(scale, c)(x_out)
+    y = Add()([x_out, xbic])
+    model = Model(inputs, x_out, name='DCSCN')
     return model
 
 

@@ -1,8 +1,8 @@
 {
-  "save_dir": "srcnn-example",
+  "save_dir": "drcn-example",
   "model": {
-    "name": "srcnn",
-    "params": {"f": [9, 1, 5],  "n": [64, 32]}
+    "name": "drcn",
+    "params": {}
   },
   "loss": {
     "name": "mse",
@@ -15,7 +15,7 @@
   "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": ["Set5", "Set14"],
-  "lr_sub_size": 20,
-  "lr_sub_stride": 11,
-  "epochs": 5
+  "lr_sub_size": 14,
+  "lr_sub_stride": 7,
+  "epochs": 2
 }

@@ -44,15 +44,16 @@ class Conv2DSubPixel(Layer):
     See https://arxiv.org/abs/1609.05158
     """
 
-    def __init__(self, scale, trainable=False, **kwargs):
+    def __init__(self, scale, channel=3, **kwargs):
         self.scale = scale
-        super().__init__(trainable=trainable, **kwargs)
+        self.channel = channel
+        super().__init__(trainable=False, **kwargs)
 
     def call(self, t, **kwargs):
         r = self.scale
         shape = K.shape(t)
         H, W = shape[1], shape[2]
-        C = shape[-1] // (r ** 2)
+        C = self.channel
         t = K.reshape(t, [-1, H, W, r, r, C])
         # Here we are different from Equation 4 from the paper. That equation
         # is equivalent to switching 3 and 4 in `perm`. But I feel my
@@ -93,6 +94,21 @@ class Gray2RGB(Layer):
 custom_layers['Gray2RGB'] = Gray2RGB
 
 
+class CastUInt2Float(Layer):
+    """Cast input type from uint8 to float32
+
+    """
+
+    def __init__(self, **kwargs):
+        super(CastUInt2Float, self).__init__(dtype='uint8', **kwargs)
+
+    def call(self, inputs, **kwargs):
+        return tf.cast(inputs, dtype=tf.float32)
+
+
+custom_layers['CastUInt2Float'] = CastUInt2Float
+
+
 class VGGNormalize(Layer):
     '''
     Custom layer to subtract the outputs of previous layer by 120,
@@ -121,3 +137,46 @@ class VGGNormalize(Layer):
 
 
 custom_layers['VGGNormalize'] = VGGNormalize
+
+
+class RecursiveConv2D(Layer):
+    """Recursive convolution layer used in DRCN
+
+    """
+
+    def __init__(self, units, **kwargs):
+        super(RecursiveConv2D, self).__init__(**kwargs)
+        self.units = units
+
+    def build(self, input_shape):
+        self.shared_kernel = self.add_weight('RecursiveKernel', [3, 3, 256, 256], initializer='he_normal')
+        super(RecursiveConv2D, self).build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        outp = [K.relu(K.conv2d(inputs, self.shared_kernel, padding='same'))]
+        for i in range(1, self.units):
+            outp.append(K.relu(K.conv2d(outp[i - 1], self.shared_kernel, padding='same')))
+        return [outp]
+
+    def compute_output_shape(self, input_shape):
+        return [input_shape] * self.units
+
+    def compute_mask(self, inputs, mask=None):
+        return [mask] * self.units
+
+
+class WeightedAdd(Layer):
+    """Merge layers by weights
+
+    """
+
+    def __init__(self, size, **kwargs):
+        super(WeightedAdd, self).__init__(**kwargs)
+        self.size = size
+
+    def build(self, input_shape):
+        self.added_weights = self.add_weight('AddedWeights', [len(input_shape)], initializer='uniform')
+        super(WeightedAdd, self).build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        return inputs[0]
