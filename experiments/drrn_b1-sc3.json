@@ -1,14 +1,15 @@
 {
   "model": {
-    "name": "nsfsrcnn",
+    "name": "drrn_b1",
     "params": {
-      "d": 56,
-      "s": 12,
-      "m": 4,
-      "pos": 3
+      "U": 9
     }
   },
+  "loss": {
+    "name": "mse"
+  },
   "scale": 3,
+  "channel": 1,
   "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": [
@@ -16,13 +17,14 @@
     "Set14"
   ],
   "lr_sub_size": 11,
-  "lr_sub_stride": 5,
+  "lr_sub_stride": 7,
   "epochs": 100,
   "optimizer": {
-    "name": "adam",
+    "name": "sgd",
     "params": {
-      "lr": 1e-05,
-      "decay": 1e-05
+      "momentum": 0.9,
+      "lr": 0.1,
+      "decay": 0.1
     }
   }
 }

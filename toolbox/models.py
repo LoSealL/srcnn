@@ -1,25 +1,23 @@
 from keras.layers import (
     Conv2D, Conv2DTranspose, SeparableConv2D,
-    InputLayer, Input, PReLU, Dropout,
+    InputLayer, Input, LeakyReLU, Dropout, BatchNormalization as BN,
     Add, Concatenate
 )
 from keras.regularizers import l2
 from keras.models import Sequential, Model
-import tensorflow as tf
 
 from toolbox.layers import (
     ImageRescale,
     Conv2DSubPixel,
     CastUInt2Float,
-    RecursiveConv2D,
-    WeightedAdd
 )
 
 
 def bicubic(c, scale=3):
     model = Sequential()
-    model.add(InputLayer(input_shape=[None, None, c]))
-    model.add(ImageRescale(scale, method=tf.image.ResizeMethod.BICUBIC))
+    model.add(InputLayer(input_shape=[None, None, c], dtype='uint8'))
+    model.add(CastUInt2Float())
+    model.add(ImageRescale(scale))
     return model
 
 
@@ -32,6 +30,7 @@ def srcnn(c, f=(9, 1, 5), n=(64, 32), scale=3):
     model = Sequential()
     model.add(InputLayer([None, None, c], dtype='uint8'))
     model.add(CastUInt2Float())
+    model.add(ImageRescale(scale))
     for ni, fi in zip(n, f):
         model.add(Conv2D(ni, fi, padding='same',
                          kernel_initializer='he_normal', activation='relu'))
@@ -91,19 +90,6 @@ def espcn(c, f=(5, 3, 3), n=(64, 32), scale=3):
     See https://arxiv.org/abs/1609.05158
     """
 
-    def ps_init(shape, dtype=None):
-        r, _, C, _ = shape
-        indices = []
-        for i in range(r):
-            indices.append([])
-            for j in range(r):
-                indices[i].append([])
-                for _ in range(C):
-                    indices[i][j].append(i * r + j)
-        kernel = tf.one_hot(indices, r * r * C, dtype=dtype, name='ps_kernel')
-        assert kernel.shape == shape
-        return kernel
-
     assert len(f) == len(n) + 1
     model = Sequential()
     model.add(InputLayer([None, None, c], dtype='uint8'))
@@ -113,12 +99,7 @@ def espcn(c, f=(5, 3, 3), n=(64, 32), scale=3):
                          kernel_initializer='he_normal', activation='tanh'))
     model.add(Conv2D(c * scale ** 2, f[-1], padding='same',
                      kernel_initializer='he_normal'))
-    # model.add(Conv2DTranspose(c, scale,
-    #                           strides=scale,
-    #                           padding='same',
-    #                           kernel_initializer=ps_init,
-    #                           trainable=False))
-    model.add(Conv2DSubPixel(scale))
+    model.add(Conv2DSubPixel(scale, c))
     return model
 
 
@@ -127,28 +108,7 @@ def drcn(c, f=256, k=3, scale=3):
 
      See https://arxiv.org/abs/1511.04491
     """
-
-    def embed(t):
-        t = Conv2D(f, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
-        t = Conv2D(f, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
-        return t
-
-    def infer(t, recursion=16):
-        return RecursiveConv2D(recursion)(t)
-
-    def reconstruct(t):
-        t = Conv2D(f, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
-        t = Conv2D(c, k, padding='same', activation='relu', kernel_initializer='he_normal')(t)
-        return t
-
-    x = Input(shape=[None, None, c], dtype='uint8')
-    x0 = CastUInt2Float()(x)
-    x1 = embed(x0)
-    x2 = infer(x1)
-    x3 = [Add()([x0, reconstruct(t)]) for t in x2]
-    y = WeightedAdd(len(x3))(x3)
-    model = Model(x, [y] + x3, name='DRCN')
-    return model
+    raise RuntimeError('Unimplemented!')
 
 
 def fastsr(c, scale=3):
@@ -159,7 +119,7 @@ def fastsr(c, scale=3):
     model.add(SeparableConv2D(32, 5, padding='same', activation='relu', kernel_initializer='he_normal'))
     model.add(SeparableConv2D(c * scale ** 2, 5, padding='same',
                               activation='relu', kernel_initializer='he_normal'))
-    model.add(Conv2DSubPixel(scale))
+    model.add(Conv2DSubPixel(scale, c))
     return model
 
 
@@ -181,7 +141,7 @@ def dcscn(c, nfilters=7, f=(96, 76, 65, 55, 47, 39, 32), A=64, B=(32, 32), scale
 
     inputs = Input([None, None, c], dtype='uint8')
     xflt = CastUInt2Float()(inputs)
-    xbic = bicubic(c, scale)(xflt)
+    xbic = ImageRescale(scale)(xflt)
     x = [xflt]
     for i in range(nfilters):
         x.append(conv2d(x[i], f[i], 3))
@@ -189,11 +149,32 @@ def dcscn(c, nfilters=7, f=(96, 76, 65, 55, 47, 39, 32), A=64, B=(32, 32), scale
     a1 = conv2d(x_concat, A, 1, name='A1')
     b1 = conv2d(x_concat, B[0], 1, name='B1')
     b2 = conv2d(b1, B[1], 3, name='B2')
-    x_concat = Concatenate(axis=3)([a1, b1, b2])
+    x_concat = Concatenate(axis=3)([a1, b2])
     x_out = conv2d(x_concat, scale ** 2, 1)
     x_out = Conv2DSubPixel(scale, c)(x_out)
     y = Add()([x_out, xbic])
     model = Model(inputs, x_out, name='DCSCN')
+    return model
+
+
+def drrn(c, B=1, U=3, scale=3):
+    """Deep Recursive Residual Network
+
+    See http://cvlab.cse.msu.edu/pdfs/Tai_Yang_Liu_CVPR2017.pdf
+    """
+
+    from toolbox.layers import DRRNResidualBlock
+
+    inputs = Input([None, None, c], dtype='uint8')
+    inp = CastUInt2Float()(inputs)
+    inp = ImageRescale(scale)(inp)
+    x = Conv2D(128, 3, padding='same', kernel_initializer='he_normal')(inp)
+    for _ in range(B):
+        x = DRRNResidualBlock(U, 128, 3)(x)
+    x = Conv2D(c, 1, padding='same',
+               activation='relu', kernel_initializer='he_normal')(x)
+    outputs = Add()([x, inp])
+    model = Model(inputs, outputs, name='DRRN')
     return model
 
 

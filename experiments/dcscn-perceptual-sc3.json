@@ -1,14 +1,20 @@
 {
   "model": {
-    "name": "srcnn",
+    "name": "dcscn",
     "params": {
+      "nfilters": 7,
       "f": [
-        9,
-        5,
-        5
+        96,
+        76,
+        65,
+        55,
+        47,
+        39,
+        32
       ],
-      "n": [
-        64,
+      "A": 64,
+      "B": [
+        32,
         32
       ]
     }
@@ -34,7 +40,7 @@
   "optimizer": {
     "name": "adam",
     "params": {
-      "lr": 1e-05,
+      "lr": 0.001,
       "decay": 1e-05
     }
   }

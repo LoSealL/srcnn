@@ -1,12 +1,26 @@
 {
   "model": {
-    "name": "nsfsrcnn",
+    "name": "dcscn",
     "params": {
-      "d": 56,
-      "s": 12,
-      "m": 4,
-      "pos": 3
+      "nfilters": 7,
+      "f": [
+        96,
+        76,
+        65,
+        55,
+        47,
+        39,
+        32
+      ],
+      "A": 64,
+      "B": [
+        32,
+        32
+      ]
     }
+  },
+  "loss": {
+    "name": "mse"
   },
   "scale": 3,
   "train_set": "91-image",
@@ -21,7 +35,7 @@
   "optimizer": {
     "name": "adam",
     "params": {
-      "lr": 1e-05,
+      "lr": 0.001,
       "decay": 1e-05
     }
   }

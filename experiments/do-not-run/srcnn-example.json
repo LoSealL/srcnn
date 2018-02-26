@@ -1,5 +1,4 @@
 {
-  "save_dir": "srcnn-example",
   "model": {
     "name": "srcnn",
     "params": {"f": [9, 1, 5],  "n": [64, 32]}
@@ -9,9 +8,7 @@
     "block": 4,
     "conv": 3
   },
-  "pre_upsample": true,
   "scale": 3,
-  "channel": 1,
   "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": ["Set5", "Set14"],

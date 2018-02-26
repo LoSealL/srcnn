@@ -17,6 +17,7 @@ for scale in [3, 4]:
             if 'bicubic' not in save_dir.stem:
                 model += [save_dir.stem.rsplit('-', 1)[0].upper()]
                 metrics_file = save_dir / f'test/{test_set}/metrics.csv'
+                if not metrics_file.exists(): continue
                 metrics = pd.read_csv(str(metrics_file), index_col='name')
                 time += [metrics.time.average]
                 psnr += [metrics.psnr.average]
@@ -40,6 +41,7 @@ for scale in [3, 4]:
         if 'bicubic' not in save_dir.stem:
             model = save_dir.stem.rsplit('-', 1)[0].upper()
             history_file = save_dir / f'train/history.csv'
+            if not history_file.exists(): continue
             history = pd.read_csv(str(history_file))
             plt.plot(history.epoch, history.val_psnr, label=model, alpha=0.8)
     plt.legend()

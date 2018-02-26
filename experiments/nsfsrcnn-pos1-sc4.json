@@ -1,21 +1,28 @@
 {
-  "save_dir": "nsfsrcnn-pos1-sc4",
   "model": {
     "name": "nsfsrcnn",
-    "params": {"d": 56, "s": 12, "m": 4, "pos": 1}
+    "params": {
+      "d": 56,
+      "s": 12,
+      "m": 4,
+      "pos": 1
+    }
   },
   "scale": 4,
   "train_set": "91-image",
   "val_set": "Set5",
-  "test_sets": ["Set5", "Set14"],
+  "test_sets": [
+    "Set5",
+    "Set14"
+  ],
   "lr_sub_size": 11,
   "lr_sub_stride": 5,
-  "epochs": 200,
+  "epochs": 100,
   "optimizer": {
     "name": "adam",
     "params": {
-      "lr": 1e-5,
-      "decay": 1e-5
+      "lr": 1e-05,
+      "decay": 1e-05
     }
   }
 }

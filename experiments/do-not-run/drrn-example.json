@@ -1,0 +1,23 @@
+{
+  "model": {
+    "name": "drrn",
+    "params": {
+      "B": 1,
+      "U": 3
+    }
+  },
+  "loss": {
+    "name": "mse"
+  },
+  "scale": 3,
+  "channel": 1,
+  "train_set": "91-image",
+  "val_set": "Set5",
+  "test_sets": [
+    "Set5",
+    "Set14"
+  ],
+  "lr_sub_size": 14,
+  "lr_sub_stride": 7,
+  "epochs": 2
+}

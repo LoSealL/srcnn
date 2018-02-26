@@ -9,6 +9,7 @@ from pathlib import Path
 from keras import backend as K
 from keras.callbacks import CSVLogger, ModelCheckpoint, EarlyStopping
 from keras.preprocessing.image import img_to_array
+from keras.utils import plot_model
 # export pb model
 import tensorflow as tf
 
@@ -17,6 +18,7 @@ from toolbox.image import array_to_img
 from toolbox.metrics import psnr
 from toolbox.dataset import DATASET
 from toolbox.loss import get_loss
+from toolbox.models import bicubic
 from toolbox.callbacks import LearningRateScheduler, SchedulerByLossGrad
 
 
@@ -29,7 +31,6 @@ class Experiment(object):
                  loss={'name': 'mse'},
                  lr_sub_size=11,
                  lr_sub_stride=5,
-                 pre_upsample=False,
                  random=0,
                  save_dir='.',
                  **kwargs):
@@ -39,7 +40,6 @@ class Experiment(object):
                                 scale=scale,
                                 lr_sub_size=lr_sub_size,
                                 lr_sub_stride=lr_sub_stride,
-                                pre_upsample=pre_upsample,
                                 random=random)
         self.build_model = partial(build_model, scale=scale)
         self.optimizer = optimizer
@@ -145,7 +145,8 @@ class Experiment(object):
             model.input.set_shape([None] + list(x_train.shape[1:]))
             model.output.set_shape([None] + list(y_train.shape[1:]))
             model = self.compile(model)
-            model.fit(x_train, y_train, epochs=epochs, callbacks=callbacks,
+            model.fit(x_train, y_train, batch_size=128,
+                      epochs=epochs, callbacks=callbacks,
                       validation_data=(x_val, y_val), initial_epoch=initial_epoch)
 
         # Plot metrics history
@@ -164,7 +165,7 @@ class Experiment(object):
             plt.savefig('.'.join([prefix, metric.lower(), 'png']))
             plt.close()
 
-    def test(self, test_set='Set5', metrics=[psnr], pre_upsample=False):
+    def test(self, test_set='Set5', metrics=[psnr]):
         print('Test on', test_set)
         image_dir = self.test_dir / test_set
         image_dir.mkdir(exist_ok=True)
@@ -176,7 +177,6 @@ class Experiment(object):
             rows += [self.test_on_image(model,
                                         image_path,
                                         str(image_dir / Path(image_path).stem),
-                                        pre_upsample=pre_upsample,
                                         metrics=metrics)]
         df = pd.DataFrame(rows)
 
@@ -190,21 +190,22 @@ class Experiment(object):
 
         df.to_csv(str(self.test_dir / f'{test_set}/metrics.csv'))
 
-    def test_on_image(self, model, path, prefix, suffix='png', metrics=[psnr], pre_upsample=False):
+    def test_on_image(self, model, path, prefix, suffix='png', metrics=[psnr]):
         # Load images
-        lr_image, hr_image, cu_image = load_image_pair(path, scale=self.scale)
+        lr_image, hr_image = load_image_pair(path, scale=self.scale)
 
         # Generate bicubic image
         x = img_to_array(lr_image)[np.newaxis, ...]
-        y = img_to_array(cu_image)[np.newaxis, ...]
+        bicubic_model = bicubic(3, scale=self.scale)
+        y = bicubic_model.predict_on_batch(x)
+        cu_image = array_to_img(np.clip(y[0], 0, 255))
 
         # Generate output image and measure run time
-        x = self.pre_process(x)
-        inputs = self.pre_process(y) if pre_upsample else x
+        x = self.pre_process(x).astype('uint8')
         if self.model_file.exists():
             model.load_weights(str(self.model_file))
         start = time.perf_counter()
-        y_pred = model.predict_on_batch(inputs.astype('uint8'))
+        y_pred = model.predict_on_batch(x)
         end = time.perf_counter()
         output_array = self.post_process(y_pred[0], y[0])
         output_image = array_to_img(output_array, mode='YCbCr')
@@ -221,7 +222,7 @@ class Experiment(object):
         images_to_save = []
         images_to_save += [(hr_image, 'original')]
         images_to_save += [(output_image, 'output')]
-        images_to_save += [(lr_image, 'input')]
+        # images_to_save += [(lr_image, 'input')]
         images_to_save += [(cu_image, 'bicubic')]
         for img, label in images_to_save:
             img.convert(mode='RGB').save('.'.join([prefix, label, suffix]))
@@ -236,6 +237,10 @@ class Experiment(object):
         model = self.compile(self.build_model(self.channel))
         if self.model_file.exists():
             model.load_weights(str(self.model_file))
+        try:
+            plot_model(model, str(self.save_dir / 'model.png'))
+        except ImportError as ex:
+            print('Fail to plot model, can not find dot.exe. Do you install graphviz?')
         sess = K.get_session()
         if not output_name:
             output_name = [n for n in model.output_names]
@@ -246,8 +251,8 @@ class Experiment(object):
             casted_outputs.append(K.cast(K.clip(outp, 0, 255), 'uint8'))
         for output, name in zip(casted_outputs, output_name):
             tf.identity(output, name=name)
-        for input, name in zip(model.inputs, input_name):
-            tf.identity(input, name=name)
+        for inp, name in zip(model.inputs, input_name):
+            tf.identity(inp, name=name)
         const_graph = tf.graph_util.convert_variables_to_constants(
             sess, sess.graph.as_graph_def(), output_name)
         write_dir = Path(pb_model_path).parent

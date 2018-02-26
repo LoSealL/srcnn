@@ -1,20 +1,32 @@
 {
-  "save_dir": "espcn-sc4",
   "model": {
     "name": "espcn",
-    "params": {"f": [5, 3, 3],  "n": [64, 32]}
+    "params": {
+      "f": [
+        5,
+        3,
+        3
+      ],
+      "n": [
+        64,
+        32
+      ]
+    }
   },
   "scale": 4,
   "train_set": "91-image",
   "val_set": "Set5",
-  "test_sets": ["Set5", "Set14"],
+  "test_sets": [
+    "Set5",
+    "Set14"
+  ],
   "lr_sub_size": 11,
   "lr_sub_stride": 5,
-  "epochs": 200,
+  "epochs": 100,
   "optimizer": {
     "name": "adam",
     "params": {
-      "lr": 1e-3,
+      "lr": 0.001,
       "decay": 0
     }
   }

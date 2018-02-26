@@ -11,12 +11,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('param_file', type=Path)
 args = parser.parse_args()
 param = json.load(args.param_file.open())
+save_dir = Path(args.param_file).stem
 
 # Model
 scale = param['scale']
 channel = param['channel'] if 'channel' in param else 1
 random = param['random'] if 'random' in param else 0
-pre_upsample = param['pre_upsample'] if 'pre_upsample' in param else False
 build_model = partial(get_model(param['model']['name']),
                       **param['model']['params'])
 if 'optimizer' in param:
@@ -34,9 +34,8 @@ expt = Experiment(scale=param['scale'], channel=channel,
                   optimizer=optimizer, loss=loss,
                   lr_sub_size=param['lr_sub_size'],
                   lr_sub_stride=param['lr_sub_stride'],
-                  pre_upsample=pre_upsample,
                   random=random,
-                  save_dir=Path('./results') / param['save_dir'])
+                  save_dir=Path('./results') / save_dir)
 
 # Training
 expt.train(train_set=param['train_set'], val_set=param['val_set'],
@@ -44,8 +43,8 @@ expt.train(train_set=param['train_set'], val_set=param['val_set'],
 
 # Evaluation
 for test_set in param['test_sets']:
-    expt.test(test_set=test_set, pre_upsample=pre_upsample)
+    expt.test(test_set=test_set)
 
 # Export tensorflow .pb model
 expt.export_pb_model(['input_lr'], ['output_hr'],
-                     Path('./results') / param['save_dir'] / 'model.pb')
+                     Path('./results') / save_dir / 'model.pb')
