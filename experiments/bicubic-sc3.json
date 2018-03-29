@@ -6,8 +6,6 @@
     "name": "bicubic",
     "params": {}
   },
-  "pre_upsample": false,
-  "save_dir": "bicubic-sc3",
   "scale": 3,
   "test_sets": [
     "Set5",

@@ -42,8 +42,11 @@ expt.train(train_set=param['train_set'], val_set=param['val_set'],
            epochs=param['epochs'], resume=True)
 
 # Evaluation
-for test_set in param['test_sets']:
-    expt.test(test_set=test_set)
+if 'test_sets' in param:
+    for test_set in param['test_sets']:
+        expt.test(test_set=test_set)
+if 'test_files' in param:
+    expt.test_file(param['test_files'])
 
 # Export tensorflow .pb model
 expt.export_pb_model(['input_lr'], ['output_hr'],

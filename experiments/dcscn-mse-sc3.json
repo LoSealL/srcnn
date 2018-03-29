@@ -29,6 +29,7 @@
     "Set5",
     "Set14"
   ],
+  "test_files": ["data/test.jpg", "data/test-small.jpg", "data/test-big.jpg"],
   "lr_sub_size": 11,
   "lr_sub_stride": 5,
   "epochs": 100,

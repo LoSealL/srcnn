@@ -19,5 +19,13 @@
   ],
   "lr_sub_size": 14,
   "lr_sub_stride": 7,
-  "epochs": 2
+  "epochs": 2,
+  "optimizer": {
+    "name": "sgd",
+    "params": {
+      "momentum": 0.9,
+      "lr": 0.1,
+      "decay": 0.1
+    }
+  }
 }

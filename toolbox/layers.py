@@ -140,8 +140,10 @@ custom_layers['VGGNormalize'] = VGGNormalize
 
 
 class DRRNResidualBlock(Layer):
-    """
+    """Deep Recursive Residual Network
 
+    Recursive block
+    See http://cvlab.cse.msu.edu/pdfs/Tai_Yang_Liu_CVPR2017.pdf
     """
 
     def __init__(self, units, filters=128, kernel_size=3, **kwargs):
@@ -169,36 +171,39 @@ class DRRNResidualBlock(Layer):
             self.b.append(self.add_weight(f'ResidualBias{i}',
                                           shape=(self.f,),
                                           initializer='zeros'))
-        shape = (input_shape[self.axis],)
-        self.gamma = self.add_weight(shape=shape,
-                                     name='bn_gamma',
-                                     initializer='ones')
-        self.beta = self.add_weight(shape=shape,
-                                    name='bn_beta',
-                                    initializer='zeros')
-        self.moving_mean = self.add_weight(
-            shape=shape,
-            name='bn_moving_mean',
-            initializer='zeros',
-            trainable=False)
-        self.moving_variance = self.add_weight(
-            shape=shape,
-            name='bn_moving_variance',
-            initializer='ones',
-            trainable=False)
-        self.momentum = 0.99
+        # shape = (input_shape[self.axis],)
+        # self.gamma = self.add_weight(shape=shape,
+        #                              name='bn_gamma',
+        #                              initializer='ones')
+        # self.beta = self.add_weight(shape=shape,
+        #                             name='bn_beta',
+        #                             initializer='zeros')
+        # self.moving_mean = self.add_weight(
+        #     shape=shape,
+        #     name='bn_moving_mean',
+        #     initializer='zeros',
+        #     trainable=False)
+        # self.moving_variance = self.add_weight(
+        #     shape=shape,
+        #     name='bn_moving_variance',
+        #     initializer='ones',
+        #     trainable=False)
+        # self.momentum = 0.99
         self.built = True
 
     def call(self, inputs, training=None, **kwargs):
         inp = K.conv2d(inputs, self.w[0], padding='same')
         inp = K.bias_add(inp, self.b[0])
         recursive_inp = inp
+        from keras.layers import BatchNormalization as BN
         for i in range(1, self.U + 1):
-            x = self._bn(recursive_inp, training)
+            # x = self._bn(recursive_inp, training)
+            x = BN()(recursive_inp)
             x = K.relu(x)
             x = K.conv2d(x, self.w[1], padding='same')
             x = K.bias_add(x, self.b[1])
-            x = self._bn(x, training)
+            # x = self._bn(x, training)
+            x = BN()(x)
             x = K.relu(x)
             x = K.conv2d(x, self.w[2], padding='same')
             x = K.bias_add(x, self.b[2])

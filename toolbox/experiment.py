@@ -190,7 +190,19 @@ class Experiment(object):
 
         df.to_csv(str(self.test_dir / f'{test_set}/metrics.csv'))
 
-    def test_on_image(self, model, path, prefix, suffix='png', metrics=[psnr]):
+    def test_file(self, filepaths, metrics=[psnr]):
+        print('Test on individual files')
+        image_dir = self.test_dir
+        # Evaluate metrics on each image
+        model = self.compile(self.build_model(self.channel))
+        rows = []
+        for image_path in filepaths:
+            rows += [self.test_on_image(model,
+                                        image_path,
+                                        str(image_dir / Path(image_path).stem),
+                                        metrics=metrics)]
+
+    def test_on_image(self, model, path, prefix, suffix='jpg', metrics=[psnr]):
         # Load images
         lr_image, hr_image = load_image_pair(path, scale=self.scale)
 
@@ -225,7 +237,7 @@ class Experiment(object):
         # images_to_save += [(lr_image, 'input')]
         images_to_save += [(cu_image, 'bicubic')]
         for img, label in images_to_save:
-            img.convert(mode='RGB').save('.'.join([prefix, label, suffix]))
+            img.convert(mode='RGB').save('.'.join([prefix, label, suffix]), quality=95)
 
         return row
 
