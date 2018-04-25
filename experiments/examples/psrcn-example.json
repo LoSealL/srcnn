@@ -14,11 +14,12 @@
   },
   "pre_upsample": false,
   "scale": 3,
-  "channel": 1,
+  "channel": 4,
+  "batch": 50,
   "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": ["Set5", "Set14"],
   "lr_sub_size": 20,
   "lr_sub_stride": 11,
-  "epochs": 200
+  "epochs": 10
 }

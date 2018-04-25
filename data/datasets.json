@@ -102,5 +102,12 @@
       "url": "d:/Datasets/Imagenet/20180122",
       "filter": "*.jpg"
     }
+  },
+  "MCL-V": {
+    "name": "MCL-V",
+    "train": {
+      "url": "d:/Datasets/MCL-V/reference_YUV_sequences",
+      "filter": "*.yuv"
+    }
   }
 }

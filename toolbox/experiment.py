@@ -18,7 +18,7 @@ from toolbox.image import array_to_img
 from toolbox.metrics import psnr
 from toolbox.dataset import DATASET
 from toolbox.loss import get_loss
-from toolbox.models import bicubic
+from toolbox.models import *
 from toolbox.callbacks import LearningRateScheduler, SchedulerByLossGrad
 
 
@@ -59,6 +59,8 @@ class Experiment(object):
         self.test_dir = self.save_dir / 'test'
         self.test_dir.mkdir(exist_ok=True)
 
+        self.model = None
+
     def weights_file(self, epoch=None):
         if epoch is None:
             return self.weights_dir / 'ep{epoch:04d}.hdf5'
@@ -73,12 +75,17 @@ class Experiment(object):
             pass
         return -1
 
-    def _ensure_dimension(self, array, dim):
+    @staticmethod
+    def _ensure_dimension(array, dim):
         while len(array.shape) < dim:
             array = array[np.newaxis, ...]
         return array
 
-    def _ensure_channel(self, array, c):
+    @staticmethod
+    def _ensure_channel(array, c):
+        array_c = array.shape[-1]
+        if array_c < c:
+            array = np.concatenate((array, np.ones(list(array.shape[0:-1]) + [c - array_c])), axis=-1)
         return array[..., 0:c]
 
     def pre_process(self, array):
@@ -89,6 +96,7 @@ class Experiment(object):
     def post_process(self, array, auxiliary_array=None):
         if self.channel == 1:
             array = np.concatenate([array, auxiliary_array[..., 1:]], axis=-1)
+        array = array[..., 0:3]
         array = np.clip(array, 0, 255)
         return array
 
@@ -104,9 +112,10 @@ class Experiment(object):
                       metrics=[psnr])
         return model
 
-    def train(self, train_set='91-image', val_set='Set5', epochs=1, resume=True):
+    def train(self, train_set='91-image', val_set='Set5', batch_size=128, epochs=1, resume=True):
         # Compile model
-        model = self.build_model(self.channel)
+        self.model = self.build_model(self.channel)
+        model = self.model
         model.summary()
         # Inherit weights
         skip_training = False
@@ -142,10 +151,10 @@ class Experiment(object):
             y_train, y_val = [self.inverse_post_process(y)
                               for y in [y_train, y_val]]
             # Train
-            model.input.set_shape([None] + list(x_train.shape[1:]))
-            model.output.set_shape([None] + list(y_train.shape[1:]))
+            # model.input.set_shape([None] + list(x_train.shape[1:]))
+            # model.output.set_shape([None] + list(y_train.shape[1:]))
             model = self.compile(model)
-            model.fit(x_train, y_train, batch_size=128,
+            model.fit(x_train, y_train, batch_size=batch_size,
                       epochs=epochs, callbacks=callbacks,
                       validation_data=(x_val, y_val), initial_epoch=initial_epoch)
 
@@ -165,13 +174,13 @@ class Experiment(object):
             plt.savefig('.'.join([prefix, metric.lower(), 'png']))
             plt.close()
 
-    def test(self, test_set='Set5', metrics=[psnr]):
+    def test(self, test_set='Set5', metrics=tuple([psnr])):
         print('Test on', test_set)
         image_dir = self.test_dir / test_set
         image_dir.mkdir(exist_ok=True)
 
         # Evaluate metrics on each image
-        model = self.compile(self.build_model(self.channel))
+        model = self.compile(self.build_model(self.channel)) if not self.model else self.model
         rows = []
         for image_path in DATASET[test_set.upper()].val:
             rows += [self.test_on_image(model,
@@ -190,11 +199,11 @@ class Experiment(object):
 
         df.to_csv(str(self.test_dir / f'{test_set}/metrics.csv'))
 
-    def test_file(self, filepaths, metrics=[psnr]):
+    def test_file(self, filepaths, metrics=tuple([psnr])):
         print('Test on individual files')
         image_dir = self.test_dir
         # Evaluate metrics on each image
-        model = self.compile(self.build_model(self.channel))
+        model = self.compile(self.build_model(self.channel)) if not self.model else self.model
         rows = []
         for image_path in filepaths:
             rows += [self.test_on_image(model,
@@ -202,9 +211,9 @@ class Experiment(object):
                                         str(image_dir / Path(image_path).stem),
                                         metrics=metrics)]
 
-    def test_on_image(self, model, path, prefix, suffix='jpg', metrics=[psnr]):
+    def test_on_image(self, model, path, prefix, suffix='jpg', metrics=tuple([psnr])):
         # Load images
-        lr_image, hr_image = load_image_pair(path, scale=self.scale)
+        lr_image, hr_image = load_image_pair(path, scale=self.scale, mode='YCbCr')
 
         # Generate bicubic image
         x = img_to_array(lr_image)[np.newaxis, ...]
@@ -228,7 +237,7 @@ class Experiment(object):
         row['time'] = end - start
         y_true = self.inverse_post_process(img_to_array(hr_image))
         for metric in metrics:
-            row[metric.__name__] = K.eval(metric(y_true, y_pred))
+            row[metric.__name__] = K.eval(metric(y_true[..., :3], y_pred[..., :3]))
 
         # Save images
         images_to_save = []
@@ -242,27 +251,28 @@ class Experiment(object):
         return row
 
     def export_pb_model(self, input_name=None, output_name=None,
-                        pb_model_path='model.pb'):
+                        pb_model_path='model.pb', bgr=False):
         if K.backend() != 'tensorflow':
             print("Can't export model for keras backend is %s" % K.backend())
             return
-        model = self.compile(self.build_model(self.channel))
+        model = self.compile(self.build_model(self.channel)) if not self.model else self.model
         if self.model_file.exists():
             model.load_weights(str(self.model_file))
+            model = composeModel(4, self.scale, model, bgr)
+            model = self.compile(model)
+            model.summary()
         try:
             plot_model(model, str(self.save_dir / 'model.png'))
-        except ImportError as ex:
+        except ImportError:
             print('Fail to plot model, can not find dot.exe. Do you install graphviz?')
         sess = K.get_session()
         if not output_name:
             output_name = [n for n in model.output_names]
-        if not input_name:
-            input_name = [n for n in model.input_names]
         casted_outputs = []
         for outp in model.outputs:
             casted_outputs.append(K.cast(K.clip(outp, 0, 255), 'uint8'))
-        for output, name in zip(casted_outputs, output_name):
-            tf.identity(output, name=name)
+        for outp, name in zip(casted_outputs, output_name):
+            tf.identity(outp, name=name)
         for inp, name in zip(model.inputs, input_name):
             tf.identity(inp, name=name)
         const_graph = tf.graph_util.convert_variables_to_constants(

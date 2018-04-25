@@ -1,8 +1,21 @@
 {
+  "batch": 50,
+  "epochs": 5000,
+  "channel": 1,
+  "loss": {
+    "name": "mse"
+  },
+  "outputformat": "BGR",
+  "lr_sub_size": 11,
+  "lr_sub_stride": 5,
   "model": {
     "name": "dcscn",
     "params": {
-      "nfilters": 7,
+      "A": 64,
+      "B": [
+        32,
+        32
+      ],
       "f": [
         96,
         76,
@@ -12,32 +25,23 @@
         39,
         32
       ],
-      "A": 64,
-      "B": [
-        32,
-        32
-      ]
+      "nfilters": 7
     }
   },
-  "loss": {
-    "name": "mse"
+  "optimizer": {
+    "name": "adam",
+    "params": {
+      "decay": 1e-05,
+      "lr": 0.001
+    }
   },
   "scale": 3,
-  "train_set": "91-image",
-  "val_set": "Set5",
+  "test_files": [
+  ],
   "test_sets": [
     "Set5",
     "Set14"
   ],
-  "test_files": ["data/test.jpg", "data/test-small.jpg", "data/test-big.jpg"],
-  "lr_sub_size": 11,
-  "lr_sub_stride": 5,
-  "epochs": 100,
-  "optimizer": {
-    "name": "adam",
-    "params": {
-      "lr": 0.001,
-      "decay": 1e-05
-    }
-  }
+  "train_set": "91-image",
+  "val_set": "Set5"
 }

@@ -105,18 +105,32 @@ def mse_calc():
 def test_pb_model():
     import tensorflow as tf
     from tensorflow.python.platform import gfile
+    from toolbox.data import load_image_pair
+    from toolbox.data import img_to_array
+    from toolbox.image import array_to_img
+    from toolbox.dataset import DATASET
     with tf.Session() as sess:
-        model_filename = '../results/srcnn-example/model.pb'
+        model_filename = '../results/dcscn-mse-sc3/model.pb'
         with gfile.FastGFile(model_filename, 'rb') as f:
             graph_def = tf.GraphDef()
             graph_def.ParseFromString(f.read())
             g_in = tf.import_graph_def(graph_def)
         g = sess.graph
-        img = np.ones([1, 256, 256, 1])
-        a = sess.graph.get_tensor_by_name("import/input_4:0")
-        b = sess.graph.get_tensor_by_name("import/CastedClipOutput:0")
-        sess.run("import/CastedClipOutput:0", feed_dict={"import/input_4:0": img})
+        url = DATASET['SET5'].val[0]
+        img, _ = load_image_pair('../results/help.png')
+        bicubic_rescale(img, 3, 'RGB').save('../results/test_cmp.png')
+        img = img_to_array(img)
+        img = np.concatenate((img, np.ones(list(img.shape[0:-1]) + [1])), axis=-1)
+        img = np.expand_dims(img, axis=0)
+        out = sess.run("import/output_hr:0", feed_dict={"import/input_lr_rgb:0": img})
+        img = array_to_img(out[0][..., :3], 'RGB')
+        img.save('../results/test.png')
+
+
+def test_data_yuv():
+    from toolbox.data import load_video_set_raw
+    x = load_video_set_raw('MCL-V', 3, [1080, 1920], stride=480)
 
 
 if __name__ == '__main__':
-    test_pb_model()
+    test_data_yuv()

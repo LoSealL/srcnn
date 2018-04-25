@@ -1,28 +1,28 @@
 {
-  "save_dir": "dcscn-example",
+  "save_dir": "red-example",
   "model": {
-    "name": "dcscn",
-    "params": {"nfilters": 7, "f": [96, 76, 65, 55, 47, 39, 32], "A": 64, "B": [32, 32]}
+    "name": "red",
+    "params": {"depth": 10, "f": 32, "k": 3, "skip_step": 2}
   },
   "loss": {
     "name": "mse",
     "block": 3,
     "conv": 2
   },
+  "batch": 50,
   "scale": 3,
   "channel": 1,
-  "batch": 50,
   "train_set": "91-image",
   "val_set": "Set5",
   "test_sets": ["Set5", "Set14"],
-  "lr_sub_size": 20,
+  "lr_sub_size": 50,
   "lr_sub_stride": 11,
   "epochs": 10,
   "optimizer": {
     "name": "adam",
     "params": {
-      "lr": 0.02,
-      "decay": 0
+      "lr": 1e-4,
+      "decay": 1e-6
     }
   }
 }

@@ -91,7 +91,92 @@ class Gray2RGB(Layer):
         return tf.image.grayscale_to_rgb(inputs)
 
 
-custom_layers['Gray2RGB'] = Gray2RGB
+class RGB2Gray(Layer):
+    def __init__(self):
+        super(RGB2Gray, self).__init__(trainable=False)
+
+    def call(self, inputs, **kwargs):
+        inputs = tf.image.rgb_to_grayscale(inputs)
+        return tf.image.convert_image_dtype(inputs, dtype=tf.uint8)
+
+
+class RGB2YUV(Layer):
+    def __init__(self, bgr=False, **kwargs):
+        if K.backend() != 'tensorflow':
+            raise RuntimeError('Must be used in tensorflow backend!')
+        self.bgr = bgr
+        super(RGB2YUV, self).__init__(trainable=False, **kwargs)
+
+    def call(self, inputs, **kwargs):
+        if self.bgr:
+            inputs = inputs[:, :, :, ::-1]
+        return tf.image.rgb_to_yuv(inputs)
+
+
+class YUV2RGB(Layer):
+    def __init__(self, bgr=False, **kwargs):
+        if K.backend() != 'tensorflow':
+            raise RuntimeError('Must be used in tensorflow backend!')
+        self.bgr = bgr
+        super(YUV2RGB, self).__init__(trainable=False, **kwargs)
+
+    def call(self, inputs, **kwargs):
+        inputs = tf.image.yuv_to_rgb(inputs)
+        if self.bgr:
+            inputs = inputs[:, :, :, ::-1]
+        return inputs
+
+
+class Scale(Layer):
+    def __init__(self, scale, **kwargs):
+        self.scale = scale
+        super(Scale, self).__init__(**kwargs)
+
+    def call(self, inputs, **kwargs):
+        scalar = tf.constant(self.scale, dtype=tf.float32)
+        return tf.scalar_mul(scalar, inputs)
+
+
+class PreProcess(Layer):
+    """A bunch of pre process to images before training
+
+    """
+
+    def __init__(self, **kwargs):
+        super(PreProcess, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        return super(PreProcess, self).build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        shape = list(inputs.shape)
+        if shape[-1] > 3:
+            shape[-1] = 3
+        return K.cast(inputs[..., :shape[-1]], dtype=K.floatx())
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[0], input_shape[1], input_shape[2], min(3, input_shape[3])
+
+
+class PostProcess(Layer):
+    def __init__(self, channel, **kwargs):
+        super(PostProcess, self).__init__(**kwargs)
+        self.channel = channel
+
+    def build(self, input_shape):
+        return super(PostProcess, self).build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        if inputs.shape[-1] != self.channel:
+            ones = K.ones_like(inputs)[..., 0:1]
+            inputs = K.concatenate((inputs, ones), axis=-1)
+        return inputs
+
+    def compute_output_shape(self, input_shape):
+        if input_shape[-1] != self.channel:
+            return input_shape[0], input_shape[1], input_shape[2], self.channel
+        else:
+            return input_shape
 
 
 class CastUInt2Float(Layer):
@@ -127,157 +212,16 @@ class VGGNormalize(Layer):
         if x.shape[-1] == 1:
             # 'Gray'->'RGB'
             x = tf.image.grayscale_to_rgb(x)
+        elif x.shape[-1] > 3:
+            # ignore alpha channel
+            x = x[..., :3]
         # 'RGB'->'BGR'
         x = x[:, :, :, ::-1]
         x -= 114
         return x
 
     def compute_output_shape(self, input_shape):
-        return input_shape
+        return input_shape[0], input_shape[1], input_shape[2], 3
 
 
 custom_layers['VGGNormalize'] = VGGNormalize
-
-
-class DRRNResidualBlock(Layer):
-    """Deep Recursive Residual Network
-
-    Recursive block
-    See http://cvlab.cse.msu.edu/pdfs/Tai_Yang_Liu_CVPR2017.pdf
-    """
-
-    def __init__(self, units, filters=128, kernel_size=3, **kwargs):
-        self.U = units
-        self.f = filters
-        self.k = kernel_size
-        self.w = []
-        self.b = []
-        self.axis = -1
-        self.epsilon = 1e-3
-        super(DRRNResidualBlock, self).__init__(**kwargs)
-        self.input_spec = InputSpec(ndim=4)
-
-    def build(self, input_shape):
-        self.w.append(self.add_weight(f'InitConv',
-                                      shape=[self.k, self.k, self.f, self.f],
-                                      initializer='he_normal'))
-        self.b.append(self.add_weight(f'InitBias',
-                                      shape=(self.f,),
-                                      initializer='zeros'))
-        for i in range(2):
-            self.w.append(self.add_weight(f'ResidualConv{i}',
-                                          shape=[self.k, self.k, self.f, self.f],
-                                          initializer='he_normal'))
-            self.b.append(self.add_weight(f'ResidualBias{i}',
-                                          shape=(self.f,),
-                                          initializer='zeros'))
-        # shape = (input_shape[self.axis],)
-        # self.gamma = self.add_weight(shape=shape,
-        #                              name='bn_gamma',
-        #                              initializer='ones')
-        # self.beta = self.add_weight(shape=shape,
-        #                             name='bn_beta',
-        #                             initializer='zeros')
-        # self.moving_mean = self.add_weight(
-        #     shape=shape,
-        #     name='bn_moving_mean',
-        #     initializer='zeros',
-        #     trainable=False)
-        # self.moving_variance = self.add_weight(
-        #     shape=shape,
-        #     name='bn_moving_variance',
-        #     initializer='ones',
-        #     trainable=False)
-        # self.momentum = 0.99
-        self.built = True
-
-    def call(self, inputs, training=None, **kwargs):
-        inp = K.conv2d(inputs, self.w[0], padding='same')
-        inp = K.bias_add(inp, self.b[0])
-        recursive_inp = inp
-        from keras.layers import BatchNormalization as BN
-        for i in range(1, self.U + 1):
-            # x = self._bn(recursive_inp, training)
-            x = BN()(recursive_inp)
-            x = K.relu(x)
-            x = K.conv2d(x, self.w[1], padding='same')
-            x = K.bias_add(x, self.b[1])
-            # x = self._bn(x, training)
-            x = BN()(x)
-            x = K.relu(x)
-            x = K.conv2d(x, self.w[2], padding='same')
-            x = K.bias_add(x, self.b[2])
-            recursive_inp = x + inp
-        recursive_outp = recursive_inp + inp
-        return recursive_outp
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
-
-    def _bn(self, inputs, training=None):
-        input_shape = K.int_shape(inputs)
-        # Prepare broadcasting shape.
-        ndim = len(input_shape)
-        reduction_axes = list(range(len(input_shape)))
-        del reduction_axes[self.axis]
-        broadcast_shape = [1] * len(input_shape)
-        broadcast_shape[self.axis] = input_shape[self.axis]
-
-        # Determines whether broadcasting is needed.
-        needs_broadcasting = (sorted(reduction_axes) != list(range(ndim))[:-1])
-
-        def normalize_inference():
-            if needs_broadcasting:
-                # In this case we must explicitly broadcast all parameters.
-                broadcast_moving_mean = K.reshape(self.moving_mean,
-                                                  broadcast_shape)
-                broadcast_moving_variance = K.reshape(self.moving_variance,
-                                                      broadcast_shape)
-                broadcast_beta = K.reshape(self.beta, broadcast_shape)
-                broadcast_gamma = K.reshape(self.gamma,
-                                            broadcast_shape)
-                return K.batch_normalization(
-                    inputs,
-                    broadcast_moving_mean,
-                    broadcast_moving_variance,
-                    broadcast_beta,
-                    broadcast_gamma,
-                    epsilon=self.epsilon)
-            else:
-                return K.batch_normalization(
-                    inputs,
-                    self.moving_mean,
-                    self.moving_variance,
-                    self.beta,
-                    self.gamma,
-                    epsilon=self.epsilon)
-
-        # If the learning phase is *static* and set to inference:
-        if training in {0, False}:
-            return normalize_inference()
-
-        # If the learning is either dynamic, or set to training:
-        normed_training, mean, variance = K.normalize_batch_in_training(
-            inputs, self.gamma, self.beta, reduction_axes,
-            epsilon=self.epsilon)
-
-        if K.backend() != 'cntk':
-            sample_size = K.prod([K.shape(inputs)[axis]
-                                  for axis in reduction_axes])
-            sample_size = K.cast(sample_size, dtype=K.dtype(inputs))
-
-            # sample variance - unbiased estimator of population variance
-            variance *= sample_size / (sample_size - (1.0 + self.epsilon))
-
-        self.add_update([K.moving_average_update(self.moving_mean,
-                                                 mean,
-                                                 self.momentum),
-                         K.moving_average_update(self.moving_variance,
-                                                 variance,
-                                                 self.momentum)],
-                        inputs)
-
-        # Pick the normalized form corresponding to the training phase.
-        return K.in_train_phase(normed_training,
-                                normalize_inference,
-                                training=training)

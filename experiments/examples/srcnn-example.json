@@ -8,10 +8,13 @@
     "block": 4,
     "conv": 3
   },
+  "batch": 25,
+  "channel": 4,
   "scale": 3,
   "train_set": "91-image",
   "val_set": "Set5",
-  "test_files": ["data/test.jpg", "data/test-small.jpg"],
+  "test_sets": ["Set5"],
+  "test_files": [],
   "lr_sub_size": 20,
   "lr_sub_stride": 11,
   "epochs": 5

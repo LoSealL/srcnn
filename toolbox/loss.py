@@ -14,6 +14,13 @@ def dummy(**kwargs):
     return lambda x, y: K.variable(0.0)
 
 
+def mse_gray(**kwargs):
+    def loss(y_true, y_pred):
+        return K.mean(K.square(y_true[..., :1] - y_pred[..., :1]))
+
+    return loss
+
+
 def tv(**kwargs):
     """Total variation
     Smooth the output image
@@ -24,9 +31,10 @@ def tv(**kwargs):
         x_out = y_pred
         shape = K.shape(x_out)
         img_width, img_height, channel = (shape[1], shape[2], shape[3])
+        channel = K.minimum(3, channel)
         size = img_width * img_height * channel
-        a = K.square(x_out[:, :img_width - 1, :img_height - 1, :] - x_out[:, 1:, :img_height - 1, :])
-        b = K.square(x_out[:, :img_width - 1, :img_height - 1, :] - x_out[:, :img_width - 1, 1:, :])
+        a = K.square(x_out[:, :img_width - 1, :img_height - 1, :3] - x_out[:, 1:, :img_height - 1, :3])
+        b = K.square(x_out[:, :img_width - 1, :img_height - 1, :3] - x_out[:, :img_width - 1, 1:, :3])
         return weight * K.sum(K.pow(a + b, 1.25)) / K.cast(size, K.floatx())
 
     return loss

@@ -7,10 +7,11 @@ def array_to_img(x, mode='YCbCr'):
     return Image.fromarray(x.astype('uint8'), mode=mode)
 
 
-def bicubic_rescale(image, scale):
-    if isinstance(scale, (float, int)):
-        size = (np.array(image.size) * scale).astype(int)
-    return image.resize(size, resample=Image.BICUBIC)
+def bicubic_rescale(image, scale, mode='YCbCr'):
+    assert isinstance(scale, (float, int))
+    size = (np.array(image.size) * scale).astype(int)
+    image = image.convert('YCbCr')
+    return image.resize(size, resample=Image.BICUBIC).convert(mode)
 
 
 def modcrop(image, scale):

@@ -1,4 +1,16 @@
 {
+  "batch": 50,
+  "epochs": 100,
+  "loss": {
+    "block": 3,
+    "conv": 2,
+    "name": "mse_pl_tv",
+    "weight0": 1,
+    "weight1": 4,
+    "weight2": 0.001
+  },
+  "lr_sub_size": 11,
+  "lr_sub_stride": 5,
   "model": {
     "name": "srcnn",
     "params": {
@@ -13,30 +25,22 @@
       ]
     }
   },
-  "loss": {
-    "name": "mse_pl_tv",
-    "weight0": 1,
-    "weight1": 4,
-    "weight2": 0.001,
-    "block": 3,
-    "conv": 2
+  "optimizer": {
+    "name": "adam",
+    "params": {
+      "decay": 1e-05,
+      "lr": 0.001
+    }
   },
   "scale": 3,
-  "train_set": "91-image",
-  "val_set": "Set5",
+  "test_files": [
+    "data/test.jpg",
+    "data/test-small.jpg"
+  ],
   "test_sets": [
     "Set5",
     "Set14"
   ],
-  "test_files": ["data/test.jpg", "data/test-small.jpg"],
-  "lr_sub_size": 11,
-  "lr_sub_stride": 5,
-  "epochs": 100,
-  "optimizer": {
-    "name": "adam",
-    "params": {
-      "lr": 0.001,
-      "decay": 1e-05
-    }
-  }
+  "train_set": "91-image",
+  "val_set": "Set5"
 }

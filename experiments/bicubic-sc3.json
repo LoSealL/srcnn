@@ -1,7 +1,9 @@
 {
+  "batch": 50,
   "epochs": 1,
   "lr_sub_size": 11,
   "lr_sub_stride": 5,
+  "channel": 4,
   "model": {
     "name": "bicubic",
     "params": {}

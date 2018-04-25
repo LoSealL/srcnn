@@ -1,4 +1,6 @@
 {
+  "channel": 3,
+  "batch": 50,
   "epochs": 2,
   "loss": {
     "name": "mse"
@@ -6,7 +8,7 @@
   "lr_sub_size": 20,
   "lr_sub_stride": 100,
   "model": {
-    "name": "espcn",
+    "name": "espcn_rgb",
     "params": {
       "f": [
         5,

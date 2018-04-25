@@ -1,33 +1,31 @@
 {
   "batch": 50,
-  "channel": 4,
-  "epochs": 100,
-  "lr_sub_size": 11,
-  "lr_sub_stride": 5,
+  "channel": 1,
+  "epochs": 500,
   "loss": {
+    "block": 3,
+    "conv": 2,
     "name": "mse"
   },
+  "lr_sub_size": 50,
+  "lr_sub_stride": 11,
   "model": {
-    "name": "espcn_rgb",
+    "name": "red",
     "params": {
-      "f": [
-        5,
-        3,
-        3
-      ],
-      "n": [
-        64,
-        32
-      ]
+      "depth": 30,
+      "f": 32,
+      "k": 3,
+      "skip_step": 2
     }
   },
   "optimizer": {
     "name": "adam",
     "params": {
-      "decay": 1e-05,
-      "lr": 0.001
+      "decay": 1e-06,
+      "lr": 0.0001
     }
   },
+  "save_dir": "red-sc3",
   "scale": 3,
   "test_sets": [
     "Set5",
