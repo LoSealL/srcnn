@@ -181,8 +181,9 @@ def load_video_set_raw(name, scale=3, size=(0, 0), mode='YV12', method='train', 
     lr_gen_sub = partial(generate_sub_images, size=patch_size // scale, stride=stride // scale)
     hr_gen_sub = partial(generate_sub_images, size=patch_size, stride=stride)
     total_files = len(DATASET[name.upper()].__getattr__(method))
-
+    patch_each_file = max_patch // total_files if max_patch else 0
     lr_batch, hr_batch = [], []
+
     for path in DATASET[name.upper()].__getattr__(method):
         fd = Path(path).open('rb')
         data = np.fromfile(fd, dtype='uint8', sep='')
@@ -202,6 +203,10 @@ def load_video_set_raw(name, scale=3, size=(0, 0), mode='YV12', method='train', 
             hr_seq.append(y)
         x = np.stack(lr_seq).transpose([1, 0, 2, 3, 4])
         y = np.stack(hr_seq).transpose([1, 0, 2, 3, 4])
-        lr_batch += np.split(x, range(seq_depth, x.shape[1], seq_depth), axis=1)
-        hr_batch += np.split(y, range(seq_depth, y.shape[1], seq_depth), axis=1)
-    return np.stack(lr_batch, axis=0).astype('uint8'), np.stack(hr_batch, axis=0).astype('uint8')
+        lr_batch += np.split(x, range(seq_depth, x.shape[1], seq_depth), axis=1)[:-1]
+        hr_batch += np.split(y, range(seq_depth, y.shape[1], seq_depth), axis=1)[:-1]
+    batch = [(lr, hr) for lr, hr in zip(lr_batch, hr_batch)]
+    np.random.shuffle(batch)
+    feature = np.concatenate([lr for lr, _ in batch]).astype('uint8')
+    label = np.concatenate([hr for _, hr in batch]).astype('uint8')
+    return feature, label

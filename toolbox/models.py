@@ -300,5 +300,53 @@ def red(c, depth, f, k=3, stride=None, skip_step=2, scale=3):
     return model
 
 
+def flow_estimate(c, k, n, s, name=None):
+    """optical flow motion estimation
+
+    :param c: scalar, input channel
+    :param k: tuple, kernel sizes
+    :param n: tuple, filter numbers
+    :param s: tuple, strides
+    :return: ME model
+    """
+
+    from keras.initializers import Orthogonal
+    inp = Input(shape=[None, None, c])
+    nn = []
+    initializer = Orthogonal(np.sqrt(2))
+    for _k, _n, _s in zip(k, n, s):
+        nn.append(Conv2D(_n, _k, _s, padding='same', activation='relu', kernel_initializer=initializer))
+    nn[-1] = Conv2D(n[-1], k[-1], s[-1], padding='same', activation='tanh', kernel_initializer=initializers)
+    x = inp
+    for _nn in nn: x = _nn(x)
+    scale = 1
+    for _s in s: scale *= _s
+    output = Conv2DSubPixel(scale, 2)(x)
+    return Model(inp, output, name=name)
+
+
+def coarse_flow(c=2, k=(5, 3, 5, 3, 3), n=(24, 24, 24, 24, 32), s=(2, 1, 2, 1, 1)):
+    return flow_estimate(c, k, n, s, name='CoarseFlowEstimation')
+
+
+def fine_flow(c=5, k=(5, 3, 3, 3, 3), n=(24, 24, 24, 24, 8), s=(2, 1, 1, 1, 1)):
+    return flow_estimate(c, k, n, s, name='FineFlowEstimation')
+
+
+def spmc():
+    """Spatial transformer motion compensation
+
+    :see ...
+    """
+
+    inp = Input(shape=[2, None, None, 1])
+    x = [inp[0], inp[1]]
+    coarse_me = coarse_flow()(x)
+    i_coarse = MotionCompensation()([inp[1], coarse_me])
+    fine_me = fine_flow()([x, coarse_me, i_coarse])
+    i_fine = MotionCompensation()([inp[1], coarse_me + fine_me])
+    return Model(inp, i_fine, name='SPMC')
+
+
 def get_model(name):
     return globals()[name]

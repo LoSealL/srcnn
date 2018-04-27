@@ -129,7 +129,15 @@ def test_pb_model():
 
 def test_data_yuv():
     from toolbox.data import load_video_set_raw
-    x = load_video_set_raw('MCL-V', 3, [1080, 1920], stride=480)
+    _, y = load_video_set_raw('MCL-V', 3, [1080, 1920], stride=480, seq_depth=5)
+    # [N, S, H, W, C]
+    shape = y.shape
+    for i in range(shape[0]):
+        path = Path('test') / ('s' + str(i))
+        path.mkdir(parents=True, exist_ok=True)
+        for j in range(shape[1]):
+            img_path = path / f'img_{j:03d}.png'
+            array_to_img(y[i, j]).convert('RGB').save(str(img_path))
 
 
 if __name__ == '__main__':

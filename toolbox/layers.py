@@ -225,3 +225,69 @@ class VGGNormalize(Layer):
 
 
 custom_layers['VGGNormalize'] = VGGNormalize
+
+
+class MotionCompensation(Layer):
+    """Compensate input frame's motion"""
+
+    def __init__(self, **kwargs):
+        super(MotionCompensation, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        super(MotionCompensation, self).build(input_shape)
+
+    def call(self, x, **kwargs):
+        """warp frame x
+
+        :param x: is the input frame to be warped
+        :return: a tensor with same shape as x
+        """
+        assert x.shape[-1] == 3  # [H, W, (gray, coordx, coordy)]
+        grid, scale = self.gen_grid(K.shape(x), x[..., 1:])
+        y = K.zeros_like(x)
+        # sample x to y according to self.grid
+        y += tf.gather_nd(x, grid[0]) * scale[1] * scale[3]
+        y += tf.gather_nd(x, grid[1]) * scale[0] * scale[3]
+        y += tf.gather_nd(x, grid[2]) * scale[0] * scale[2]
+        y += tf.gather_nd(x, grid[3]) * scale[1] * scale[2]
+        return y
+
+    @staticmethod
+    def gen_grid(shape, warp):
+        """generate coord grid
+
+        :param shape: the frame shape
+        :param warp: warp tensor by flow estimation
+        :return: the grid contains 4 tensor, upper-left, upper-right,
+                  lower-right, lower-left (clock-wise respectively);
+                  the scale factor is the interpolation of each pixel.
+        """
+        grid, scale = [], []
+        h = K.expand_dims(K.arange(0, shape[1]))
+        w = K.expand_dims(K.arange(0, shape[2]))
+        b = K.arange(0, shape[0])
+        grid_x = K.transpose(K.repeat(w, shape[1])[..., 0])
+        grid_y = K.repeat(h, shape[2])[..., 0]
+        # make batch
+        grid_x = tf.transpose(K.repeat(grid_x, shape[0]), [1, 0, 2])
+        grid_y = tf.transpose(K.repeat(grid_y, shape[0]), [1, 0, 2])
+        grid_batch = tf.transpose(tf.ones(shape[:-1]), [1, 2, 0]) * K.cast(b, K.floatx())
+        warp_x = warp[..., 0]
+        warp_y = warp[..., 1]
+        warp_xf = K.cast(warp_x, K.floatx())
+        warp_yf = K.cast(warp_y, K.floatx())
+        grid_xf = K.cast(grid_x, K.floatx())
+        grid_yf = K.cast(grid_y, K.floatx())
+        # equal to tf.floor
+        coord_x = K.clip(K.cast(grid_xf + warp_xf, 'int32'), 0, shape[2])
+        coord_y = K.clip(K.cast(grid_yf + warp_yf, 'int32'), 0, shape[1])
+        coord_batch = K.cast(tf.transpose(grid_batch, [2, 0, 1]), 'int32')
+        diff_x = grid_xf + warp_xf - K.cast(coord_x, K.floatx())
+        ndiff_x = 1 - diff_x
+        diff_y = grid_yf + warp_yf - K.cast(coord_y, K.floatx())
+        ndiff_y = 1 - diff_y
+        grid.append(K.stack([coord_batch, coord_y, coord_x], axis=-1))  # upper-left
+        grid.append(K.stack([coord_batch, coord_y, coord_x + 1], axis=-1))  # upper-right
+        grid.append(K.stack([coord_batch, coord_y + 1, coord_x + 1], axis=-1))  # lower-right
+        grid.append(K.stack([coord_batch, coord_y + 1, coord_x], axis=-1))  # lower-left
+        return grid, [diff_x, ndiff_x, diff_y, ndiff_y]
