@@ -108,6 +108,10 @@
     "train": {
       "url": "d:/Datasets/MCL-V/reference_YUV_sequences",
       "filter": "*.yuv"
+    },
+    "test": {
+      "url": "d:/Datasets/MCL-V/test",
+      "filter": "*.yuv"
     }
   }
 }

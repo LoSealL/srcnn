@@ -313,10 +313,10 @@ def flow_estimate(c, k, n, s, name=None):
     from keras.initializers import Orthogonal
     inp = Input(shape=[None, None, c])
     nn = []
-    initializer = Orthogonal(np.sqrt(2))
+    orth = Orthogonal(np.sqrt(2))
     for _k, _n, _s in zip(k, n, s):
-        nn.append(Conv2D(_n, _k, _s, padding='same', activation='relu', kernel_initializer=initializer))
-    nn[-1] = Conv2D(n[-1], k[-1], s[-1], padding='same', activation='tanh', kernel_initializer=initializers)
+        nn.append(Conv2D(_n, _k, strides=_s, padding='same', activation='relu', kernel_initializer=orth))
+    nn[-1] = Conv2D(n[-1], k[-1], strides=s[-1], padding='same', activation='tanh', kernel_initializer=orth)
     x = inp
     for _nn in nn: x = _nn(x)
     scale = 1
@@ -340,11 +340,15 @@ def spmc():
     """
 
     inp = Input(shape=[2, None, None, 1])
-    x = [inp[0], inp[1]]
+    x = Lambda(lambda t: K.concatenate([t[:, 0], t[:, 1]]))(inp)
     coarse_me = coarse_flow()(x)
-    i_coarse = MotionCompensation()([inp[1], coarse_me])
-    fine_me = fine_flow()([x, coarse_me, i_coarse])
-    i_fine = MotionCompensation()([inp[1], coarse_me + fine_me])
+    x = Lambda(lambda t: K.concatenate([t[0][:,1], t[1]]))([inp, coarse_me])
+    i_coarse = MotionCompensation(name='CoarseWarp')(x)
+    x = Lambda(lambda t: K.concatenate([t[0][:, 0], t[0][:, 1], t[1], t[2]]))([inp, coarse_me, i_coarse])
+    fine_me = fine_flow()(x)
+    total_me = Add()([coarse_me, fine_me])
+    x = Lambda(lambda t: K.concatenate([t[0][:, 1], t[1]]))([inp, total_me])
+    i_fine = MotionCompensation(name='FineWarp')(x)
     return Model(inp, i_fine, name='SPMC')
 
 

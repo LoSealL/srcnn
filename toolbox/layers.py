@@ -244,13 +244,19 @@ class MotionCompensation(Layer):
         """
         assert x.shape[-1] == 3  # [H, W, (gray, coordx, coordy)]
         grid, scale = self.gen_grid(K.shape(x), x[..., 1:])
-        y = K.zeros_like(x)
+        inp = x[..., 0:1]
+        y = K.zeros_like(inp)
         # sample x to y according to self.grid
-        y += tf.gather_nd(x, grid[0]) * scale[1] * scale[3]
-        y += tf.gather_nd(x, grid[1]) * scale[0] * scale[3]
-        y += tf.gather_nd(x, grid[2]) * scale[0] * scale[2]
-        y += tf.gather_nd(x, grid[3]) * scale[1] * scale[2]
+        y += tf.gather_nd(inp, grid[0]) * scale[1] * scale[3]
+        y += tf.gather_nd(inp, grid[1]) * scale[0] * scale[3]
+        y += tf.gather_nd(inp, grid[2]) * scale[0] * scale[2]
+        y += tf.gather_nd(inp, grid[3]) * scale[1] * scale[2]
         return y
+
+    def compute_output_shape(self, input_shape):
+        output_shape = list(input_shape)
+        output_shape[-1] = 1
+        return tuple(output_shape)
 
     @staticmethod
     def gen_grid(shape, warp):
@@ -262,6 +268,7 @@ class MotionCompensation(Layer):
                   lower-right, lower-left (clock-wise respectively);
                   the scale factor is the interpolation of each pixel.
         """
+        assert K.backend() == 'tensorflow'
         grid, scale = [], []
         h = K.expand_dims(K.arange(0, shape[1]))
         w = K.expand_dims(K.arange(0, shape[2]))
@@ -279,8 +286,8 @@ class MotionCompensation(Layer):
         grid_xf = K.cast(grid_x, K.floatx())
         grid_yf = K.cast(grid_y, K.floatx())
         # equal to tf.floor
-        coord_x = K.clip(K.cast(grid_xf + warp_xf, 'int32'), 0, shape[2])
-        coord_y = K.clip(K.cast(grid_yf + warp_yf, 'int32'), 0, shape[1])
+        coord_x = tf.clip_by_value(K.cast(grid_xf + warp_xf, 'int32'), 0, shape[2] - 2)
+        coord_y = tf.clip_by_value(K.cast(grid_yf + warp_yf, 'int32'), 0, shape[1] - 2)
         coord_batch = K.cast(tf.transpose(grid_batch, [2, 0, 1]), 'int32')
         diff_x = grid_xf + warp_xf - K.cast(coord_x, K.floatx())
         ndiff_x = 1 - diff_x
@@ -290,4 +297,5 @@ class MotionCompensation(Layer):
         grid.append(K.stack([coord_batch, coord_y, coord_x + 1], axis=-1))  # upper-right
         grid.append(K.stack([coord_batch, coord_y + 1, coord_x + 1], axis=-1))  # lower-right
         grid.append(K.stack([coord_batch, coord_y + 1, coord_x], axis=-1))  # lower-left
-        return grid, [diff_x, ndiff_x, diff_y, ndiff_y]
+        scale = [diff_x, ndiff_x, diff_y, ndiff_y]
+        return grid, [tf.expand_dims(s, axis=-1) for s in scale]
